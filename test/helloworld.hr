@@ -1,0 +1,8 @@
+for
+basic_file item = basic_fopen -> "helloworld.txt", "w"
+basic_file item = basic_fopen -> "helloworld.txt", "w"
+
+basic_file item = basic_fopen -> "helloworld.txt", "w"
+basic_file item = basic_fopen -> "helloworld.txt", "w"
+
+basic_file item = basic_fopen -> "helloworld.txt", "w"
