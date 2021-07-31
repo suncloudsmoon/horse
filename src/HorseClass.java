@@ -15,6 +15,7 @@ public class HorseClass {
 		this.header = header;
 		
 		// Initializing new objects...
+		variables = "";
 		compiled = new LinkedList<String>();
 	}
 	

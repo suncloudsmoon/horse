@@ -1,6 +1,14 @@
+// import basic libs
+import basics
+import string
+
 class helloworld
 
+	// Main function where the program enters in
 	function main() returns long
+		if 10 == 10 then
+			unsafe_printf("Hello")
+		end
 		return 5
 	end
 	
@@ -8,4 +16,15 @@ class helloworld
 		unsafe_printf("Hello, World!\n")
 	end
 	
+	function sayHi() returns String
+		unsafe_printf("Hi, World!\n")
+	end
+	
+end
+
+class Object
+
+	function toString() returns long
+		return 5
+	end
 end
