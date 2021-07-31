@@ -7,5 +7,5 @@ typedef struct {
 
 } helloworld;
 
-helloworld* helloworld(){
+helloworld* helloworld_constructor(){
 }
