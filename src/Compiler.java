@@ -3,28 +3,38 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Compiler {
+	
+	private static final String HORSE_EXTENSION = ".hs";
 
 	// oficially started 6:35
 	private String sourceFile;
 
-	// string is char pointer
-	private String[] c_identifers = { "basic_string", "basic_file" };
-	private String[] c_functions = { "basic_printf", "basic_fopen", "basic_fputs" };
+	private String classIdentifier = "class";
+	private String longIndentifier = "long";
+	private String voidIdentifier = "void";
+	private String functionIdentifer = "function";
+	private String returnIdentifier = "return";
+	
+	private String[] c_identifers = { "unsafe_string", "unsafe_file" };
+	private String[] c_functions = { "unsafe_printf", "unsafe_fopen", "unsafe_fputs" };
 
 	private String headers;
-	private String mainFunction;
-	private String endOfMainFunction;
+
+	private List<HorseClass> objects;
+	
+	private int scopeStatus; // 0 = class, 1 = function
 
 	// Inherits the C stuff and makes it safer from there
 	public Compiler(String sourceFile) {
 		this.sourceFile = sourceFile;
 
-		// All the good string stuff
 		headers = "#include <stdio.h>\n" + "#include <stdlib.h>\n" + "#include <stdbool.h>\n";
-		mainFunction = "int main(int argc, char **argv) {\n";
-		endOfMainFunction = "return 0;\n}";
+		objects = new ArrayList<>();
+		scopeStatus = 0;
 	}
 
 	// c_printf()
@@ -36,15 +46,27 @@ public class Compiler {
 
 				if (cleanOne.isBlank())
 					continue;
+				
+				System.out.println(cleanOne);
 
-				if (cleanOne.startsWith("if")) {
+				if (cleanOne.startsWith(classIdentifier)) {
+					executeClass(cleanOne);
+					
+				} else if (cleanOne.startsWith("function")) { 
+					executeFunctionDeclaration(cleanOne);
+					
+				} else if (cleanOne.startsWith(returnIdentifier)) {
+					executeReturnIndentifer(cleanOne);
+					
+				} else if (cleanOne.startsWith("if")) {
 					executeIfFunction(cleanOne);
 
 				} else if (cleanOne.startsWith("for")) {
 					executeForFuction(cleanOne);
 
 				} else if (cleanOne.startsWith("end")) {
-					mainFunction += "}\n";
+					executeEndIndentifer();
+
 				} else {
 					for (String cfunc : c_functions)
 						if (cleanOne.startsWith(cfunc))
@@ -57,8 +79,10 @@ public class Compiler {
 			}
 		}
 
-		try (FileWriter w = new FileWriter(destFile)) {
-			w.append(headers + mainFunction + endOfMainFunction);
+		for (HorseClass cls : objects) {
+			try (FileWriter w = new FileWriter("test/" + cls.getName() + ".c")) {
+				w.append(cls.getPackage());
+			}
 		}
 	}
 
@@ -79,25 +103,62 @@ public class Compiler {
 		}
 		return newStr;
 	}
+	
+	private void executeClass(String code) {
+		String className = code.substring(classIdentifier.length());
+		// Adds a new object to the list
+		objects.add(new HorseClass(className, headers));
+	}
+	
+	private void executeFunctionDeclaration(String code) {
+		// function sayHello() returns String
+		String parts[] = code.split("returns");
+		String functionName = parts[0].substring(functionIdentifer.length());
+		String returnType;
+		
+		// if it is a long, or any other primitive, then there should be no pointer
+		if (parts[1].contentEquals(voidIdentifier) || parts[1].contentEquals(longIndentifier)) {
+			returnType = parts[1];
+		} else {
+			returnType = parts[1] + "*";
+		}
+		 
+		// void sayHello();
+		String cFunctionHeader = returnType + " " + objects.get(objects.size() - 1).getName() + "_" + functionName + "{\n";
+		objects.get(objects.size() - 1).add(cFunctionHeader);
+		
+		// Change the current parentheses scope status to 1
+		scopeStatus = 1;
+	}
 
 	private void executeIfFunction(String code) {
-		mainFunction += "if (" + code.substring("if".length(), code.lastIndexOf("then")) + ") {\n";
+		String compiled = "if (" + code.substring("if".length(), code.lastIndexOf("then")) + ") {\n";
+		objects.get(objects.size() - 1).add(compiled);
 	}
 
 	private void executeForFuction(String code) {
-		mainFunction += "for (" + code.substring("for".length()).replaceAll(",", ";") + ") {\n";
+		String compiled = "for (" + code.substring("for".length()).replaceAll(",", ";") + ") {\n";
+		objects.get(objects.size() - 1).add(compiled);
 	}
 
 	private void executeCFunction(String code) {
-		System.out.println(code);
-		mainFunction += code.substring("basic_".length(), code.indexOf("->")) + "("
-				+ code.substring(code.indexOf("->") + "->".length()) + ");\n";
+		String compiled = code.substring(code.indexOf("_") + 1) + ";\n";
+		objects.get(objects.size() - 1).add(compiled);
 	}
 
 	private void executeCIdentifer(String identifer, String code) {
-		if (identifer.contentEquals("basic_string") || identifer.contentEquals("basic_file")) {
-			mainFunction += identifer + " *" + code.substring(identifer.length(), code.indexOf('=')) + " = ";
-			executeCFunction(code.substring(code.indexOf('=') + 1, code.length()));
-		}
+		String compiled = code.substring(0, code.indexOf('=')) + ";";
+		objects.get(objects.size() - 1).add(compiled);
+		executeCFunction(code.substring(code.indexOf('=') + 1, code.length()));
+	}
+	
+	private void executeReturnIndentifer(String code) {
+		objects.get(objects.size() - 1).add(returnIdentifier + " " + code.substring(returnIdentifier.length()) + ";\n");
+	}
+	
+	private void executeEndIndentifer() {
+		if (scopeStatus == 1)
+			objects.get(objects.size() - 1).add("}\n");
+		scopeStatus = 0;
 	}
 }

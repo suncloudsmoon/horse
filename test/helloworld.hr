@@ -1,8 +1,11 @@
-for
-basic_file item = basic_fopen -> "helloworld.txt", "w"
-basic_file item = basic_fopen -> "helloworld.txt", "w"
+class helloworld
 
-basic_file item = basic_fopen -> "helloworld.txt", "w"
-basic_file item = basic_fopen -> "helloworld.txt", "w"
-
-basic_file item = basic_fopen -> "helloworld.txt", "w"
+	function main() returns long
+		return 5
+	end
+	
+	function sayHello() returns String
+		unsafe_printf("Hello, World!\n")
+	end
+	
+end
