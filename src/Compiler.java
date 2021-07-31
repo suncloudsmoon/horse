@@ -13,6 +13,8 @@ public class Compiler {
 	// oficially started 6:35
 	private String sourceFile;
 
+	private String constructorIdentifier = "constructor";
+	private String importIdentifier = "import";
 	private String longIdentifier = "long";
 	private String classIdentifier = "class";
 	private String voidIdentifier = "void";
@@ -52,7 +54,10 @@ public class Compiler {
 				if (cleanOne.isBlank() || cleanOne.startsWith("//"))
 					continue;
 
-				if (cleanOne.startsWith("import")) {
+				if (cleanOne.startsWith(constructorIdentifier)) {
+					executeConstructor(cleanOne);
+					
+				} else if (cleanOne.startsWith(importIdentifier)) {
 					executeImportIdentifier(cleanOne);
 
 				} else if (cleanOne.startsWith(classIdentifier)) {
@@ -110,6 +115,7 @@ public class Compiler {
 		return newStr;
 	}
 
+	// Class/Object Functions
 	private void executeClass(String code) {
 		String className = code.substring(classIdentifier.length());
 		// Adds a new object to the list
@@ -121,6 +127,15 @@ public class Compiler {
 		scopeStatus = 0;
 	}
 
+	private void executeConstructor(String code) {
+		// constructor Hello() -> name of the class
+		String className = code.substring(constructorIdentifier.length());
+		objects.get(objects.size() - 1).add(className.substring(0, className.indexOf('(')) + "* " + className + "{\n");
+
+		// Parentheses adjuster to account for the end of class definition
+		scopeStatus++;
+	}
+	
 	private void executeFunctionDeclaration(String code) {
 		// function sayHello() returns String
 		String parts[] = code.split("returns");
@@ -172,7 +187,7 @@ public class Compiler {
 	}
 
 	private void executeImportIdentifier(String code) {
-		String thingToImport = code.substring("import".length());
+		String thingToImport = code.substring(importIdentifier.length());
 		if (thingToImport.contentEquals("basics")) {
 			headers += IMPORT_BASICS;
 		} else {
