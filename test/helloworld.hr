@@ -3,7 +3,9 @@ import basics
 import string
 
 class helloworld
-	constructor helloworld()
-		
+	constructor(char *args)
+		for int i = 0, i < 5, i++
+			unsafe_printf(args)
+		end
 	end
 end

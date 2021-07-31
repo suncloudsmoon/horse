@@ -7,5 +7,8 @@ typedef struct {
 
 } helloworld;
 
-helloworld* helloworld_constructor(){
+helloworld* helloworld_constructor(char*args){
+for (inti=0;i<5;i++) {
+printf(args);
+}
 }

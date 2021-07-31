@@ -129,8 +129,9 @@ public class Compiler {
 
 	private void executeConstructor(String code) {
 		// constructor Hello() -> name of the class
-		String className = code.substring(constructorIdentifier.length());
-		objects.get(objects.size() - 1).add(className.substring(0, className.indexOf('(')) + "* " + className.substring(0, className.indexOf('(')).concat("_").concat(constructorIdentifier) + className.substring(className.indexOf('(')) + "{\n");
+		String className = objects.get(objects.size() - 1).getName();
+		String argsWithParentheses = code.substring(constructorIdentifier.length());
+		objects.get(objects.size() - 1).add(className + "* " + className.concat("_").concat(constructorIdentifier) + argsWithParentheses + "{\n");
 
 		// Parentheses adjuster to account for the end of class definition
 		scopeStatus++;
