@@ -2,10 +2,9 @@
 import basics
 import string
 
-class helloworld
+class helloworld extends Object
+	unsafe_char *name
 	constructor(char *args)
-		for int i = 0, i < 5, i++
-			unsafe_printf(args)
-		end
+		unsafe_printf(args)
 	end
 end

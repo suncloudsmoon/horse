@@ -7,32 +7,57 @@ public class HorseClass {
 	
 	// Headers, etc.
 	private String header;
-	private String variables;
-	private List<String> compiled;
+	
+	private List<String> variableIndexList;
+	private List<String> compiledVariables;
+	private List<String> compiledLines;
 	
 	public HorseClass(String name, String header) {
 		this.name = name;
 		this.header = header;
 		
 		// Initializing new objects...
-		variables = "";
-		compiled = new LinkedList<String>();
+		variableIndexList = new LinkedList<String>();
+		compiledLines = new LinkedList<String>();
+		compiledVariables = new LinkedList<String>();
 	}
 	
 	public void add(String compiledLine) {
-		compiled.add(compiledLine);
+		compiledLines.add(compiledLine);
+	}
+	
+	/**
+	 * Can also add function names (like C where you can treat functions like pointers)
+	 * @param var
+	 */
+	public void addVariable(String var) {
+		compiledVariables.add(var);
+	}
+	
+	public void addVariableIndex(String varName) {
+		variableIndexList.add(varName);
 	}
 	
 	public String getPackage() {
-		String newStr = header + "\n" + getAllAttributes() + "\n";
-		for (String line : compiled) {
-			newStr += line;
-		}
-		return newStr;
+		return header + "\n" + getAllAttributes() + "\n" + getAllLines();
 	}
 	
 	private String getAllAttributes() {
-		return "typedef struct {\n" + variables + "\n} " + name + ";\n";
+		String fullTypedef = "typedef struct {\n";
+		for (String var : compiledVariables) {
+			fullTypedef += var + "\n";
+			System.out.println("var: " + var + "\n");
+		}
+		fullTypedef += "\n} " + name + ";\n";
+		return fullTypedef;
+	}
+	
+	private String getAllLines() {
+		String lines = "";
+		for (String line : compiledLines) {
+			lines += line + "\n";
+		}
+		return lines;
 	}
 
 	/**
