@@ -10,20 +10,32 @@ public class HorseClass {
 	
 	private List<String> variableIndexList;
 	private List<String> compiledVariables;
+	
 	private List<String> compiledLines;
+	private List<String> constructorLines;
 	
 	public HorseClass(String name, String header) {
 		this.name = name;
 		this.header = header;
 		
 		// Initializing new objects...
-		variableIndexList = new LinkedList<String>();
-		compiledLines = new LinkedList<String>();
-		compiledVariables = new LinkedList<String>();
+		compiledVariables = new LinkedList<>();
+		variableIndexList = new LinkedList<>();
+		
+		compiledLines = new LinkedList<>();
+		constructorLines = new LinkedList<>();
 	}
 	
 	public void add(String compiledLine) {
 		compiledLines.add(compiledLine);
+	}
+	
+	/**
+	 * Can map the function calls here too
+	 * @param line
+	 */
+	public void addConstructorLine(String line) {
+		constructorLines.add(line);
 	}
 	
 	/**
@@ -48,7 +60,7 @@ public class HorseClass {
 			fullTypedef += var + "\n";
 			System.out.println("var: " + var + "\n");
 		}
-		fullTypedef += "\n} " + name + ";\n";
+		fullTypedef += "\n} " + name + "_t;\n";
 		return fullTypedef;
 	}
 	

@@ -1,10 +1,8 @@
-// import basic libs
 import basics
-import string
 
-class helloworld extends Object
-	unsafe_char *name
+class helloworld
+	
 	constructor(char *args)
-		unsafe_printf(args)
+		printf(args)
 	end
 end

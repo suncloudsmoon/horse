@@ -4,6 +4,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class Compiler {
@@ -20,8 +21,8 @@ public class Compiler {
 	private String returnIdentifier = "return";
 
 	// C Identifiers
-	private String[] c_identifers = { "unsafe_char*", "unsafe_FILE", "long" };
-	private String[] c_functions = { "unsafe_printf", "unsafe_fopen", "unsafe_fputs" };
+	private String[] c_identifers = { "char*", "FILE", "long" };
+	private String[] c_functions = { "printf", "fopen", "fputs", "malloc" };
 
 	// Import stuff
 	private static final String IMPORT_BASICS = "#include <stdio.h>\n" + "#include <stdlib.h>\n"
@@ -32,6 +33,10 @@ public class Compiler {
 	private int scopeStatus; // 0 = class, 1 = function
 
 	private List<HorseClass> objects;
+
+	/*
+	 * Currently, only one space is accepted!
+	 */
 
 	// Inherits the C stuff and makes it safer from there
 	public Compiler(String sourceFile) {
@@ -50,6 +55,8 @@ public class Compiler {
 			String line;
 			while ((line = r.readLine()) != null) {
 				String cleanOne = cleanLine(line);
+
+				System.out.println("Clean One: " + cleanOne);
 
 				if (cleanOne.isEmpty() || cleanOne.startsWith("//"))
 					continue;
@@ -79,13 +86,23 @@ public class Compiler {
 					executeEndIdentifier();
 
 				} else {
-					for (String cfunc : c_functions)
-						if (cleanOne.startsWith(cfunc))
+					for (String cfunc : c_functions) {
+						if (cleanOne.startsWith(cfunc)) {
 							executeCFunction(cleanOne);
+							break;
+						}
+					}
 
-					for (String cIdent : c_identifers)
-						if (cleanOne.startsWith(cIdent))
+					for (String cIdent : c_identifers) {
+						if (cleanOne.startsWith(cIdent)) {
 							executeCIdentifer(cIdent, cleanOne);
+							break;
+						}
+					}
+
+					// If nothing is found then
+					if (indexOfSpecial('(', cleanOne) != -1)
+						executeCFunction(cleanOne);
 				}
 			}
 		}
@@ -97,26 +114,77 @@ public class Compiler {
 		}
 	}
 
+	private void executeCFunction(String code) {
+		// printf()
+		System.out.println("C Function encoutnered: " + code);
+		String replaced = "";
+		if (code.contains("."))
+			replaced = code.replaceAll(".", "->");
+		else
+			replaced = code;
+		objects.get(objects.size() - 1).add(replaced + ";");
+	}
+
+	private void executeCIdentifer(String identifier, String code) {
+		// Example: char *name = malloc()
+		String[] splitResult = splitSpecial('=', code);
+		if (splitResult.length >= 1) {
+			// only char *name is present
+			objects.get(objects.size() - 1).addVariable(splitResult[0] + ";");
+			String[] identifierSplit = code.split(" ");
+			objects.get(objects.size() - 1).addVariableIndex(identifierSplit[0]);
+
+			if (splitResult.length == 2) {
+				// char *name = malloc()
+				// char *name = previousName
+				if (indexOfSpecial('(', splitResult[1]) != -1) {
+					// then there is a function here!
+					// substring(1) for accounting for the extra space in between
+					executeCFunction(splitResult[1].substring(1));
+				} else {
+					objects.get(objects.size() - 1)
+							.addVariable(identifierSplit[1] + " = " + splitResult[1].substring(1) + ";");
+				}
+			}
+		}
+	}
+
 	// Class/Object Functions
 	private void executeClassIdentifier(String code) {
-		String className = code.substring(classIdentifier.length(), code.indexOf("extends"));
-		String afterExtends = "";
+		// Example: class Name extends Object
+		String[] splitResult = code.split(" ");
+		if (splitResult.length >= 2) {
+			// class Name
+			objects.add(new HorseClass(splitResult[1], headers));
 
-		// Adds a new object to the list
-		objects.add(new HorseClass(className, headers));
-
-		if (code.contains("extends")) {
-			afterExtends += code.substring(code.indexOf("extends") + "extends".length());
-			objects.get(objects.size() - 1).addVariable(afterExtends + " *__extends;");
+			if (splitResult.length == 4) {
+				// class Name extends Object
+				HorseClass current = objects.get(objects.size() - 1);
+				current.addVariable(splitResult[1] + " *__extends;");
+				current.addVariableIndex(splitResult[1]);
+			}
 		}
-
 		// Reset all indicators now on
-		// Reset headers, so new classes start from scratch
 		headers = "";
 		scopeStatus = 0;
 	}
 
 	private void executeConstructor(String code) {
+//		// constructor Hello()
+//		HorseClass current = objects.get(objects.size() - 1);
+//		String[] splitResult = code.split(" ", 2);
+//		String className = current.getName();
+//
+//		// It gets added to the typedef struct
+//
+//		current.addVariable(className + "* " + "(*" + splitResult[2].substring(0, splitResult[2].indexOf('(')) + ")_"
+//				+ splitResult + ";");
+//		current.addConstructorLine(className + "* " + className + "_");
+//		current.addConstructorLine(className + "*__" + className + "__obj = malloc(sizeof(" + className + "));");
+//
+//		// Parentheses adjuster to account for the end of class definition
+//		scopeStatus++;
+
 		// constructor Hello() -> name of the class
 		String className = objects.get(objects.size() - 1).getName();
 		String argsWithParentheses = code.substring(constructorIdentifier.length());
@@ -127,30 +195,39 @@ public class Compiler {
 		scopeStatus++;
 	}
 
+	private boolean isCIdentifier(String code) {
+		for (String cIdent : c_identifers)
+			if (code.startsWith(cIdent))
+				return true;
+		return false;
+	}
+
 	private void executeFunctionDeclaration(String code) {
 		// function sayHello() returns String
-		String parts[] = code.split("returns");
-		String functionName = parts[0].substring(functionIdentifer.length());
-		String returnType;
+		String splitResult[] = code.split("returns");
+		String functionHeader = splitResult[0].substring(functionIdentifer.length() + 1);
+		String returnType = splitResult[1].substring(1);
 
-		// if it is a long, or any other primitive, then there should be no pointer
-		if (parts[1].contentEquals(voidIdentifier) || parts[1].contentEquals(longIdentifier)) {
-			returnType = parts[1];
-		} else {
-			returnType = parts[1] + "*";
+		if (!isCIdentifier(returnType)) {
+			returnType += "*";
 		}
-
-		// void sayHello();
-		String cFunctionHeader = returnType + " " + objects.get(objects.size() - 1).getName() + "_" + functionName
-				+ "{\n";
-		objects.get(objects.size() - 1).add(cFunctionHeader);
+		// Add the fuction to the typedef struct & define it in the constructor
+		HorseClass current = objects.get(objects.size() - 1);
+		String functionName = functionHeader.substring(0, functionHeader.indexOf('('));
+		current.add(returnType + " " + functionHeader + "{");
+		current.addVariable(
+				returnType + "(*" + functionName + ") " + functionHeader.substring(functionHeader.indexOf('(')) + ";");
+		current.addConstructorLine("__" + current.getName() + "__obj->" + functionName + "=&" + current.getName() + "_"
+				+ functionName + ";");
 
 		// Change the current parentheses scope status to 1
 		scopeStatus++;
 	}
 
 	private void executeIfFunction(String code) {
-		String ifheader = "if (" + code.substring("if".length(), code.lastIndexOf("then")) + ") {";
+		// if 5 == 5 then
+		String ifheader = "if (" + code.substring("if".length() + 2, code.lastIndexOf("then")).replaceAll(".", "->")
+				+ ") {";
 		objects.get(objects.size() - 1).add(ifheader);
 
 		// Parentheses adjuster to account for the end of class definition
@@ -158,59 +235,33 @@ public class Compiler {
 	}
 
 	private void executeForFuction(String code) {
-		String forheader = "for (" + code.substring("for".length()).replaceAll(",", ";") + ") {";
+		// for int i = 0, i < 5, i++
+		String forheader = "for (" + code.substring("for".length() + 2).replaceAll(",", ";") + ") {";
 		objects.get(objects.size() - 1).add(forheader);
 
 		// Parentheses adjuster to account for the end of class definition
 		scopeStatus++;
 	}
 
-	private void executeCFunction(String code) {
-		String functionHeader = code.substring(code.indexOf("_") + 1) + ";";
-		objects.get(objects.size() - 1).add(functionHeader);
-	}
-
-	private void executeCIdentifer(String identifier, String code) {
-		String varName, varDeclaration;
-		if (code.contains("=")) {
-			varName = code.substring(identifier.length(), code.indexOf('='));
-			varDeclaration = code.substring(0, code.indexOf('=')) + ";";
-			// Add the variable to the list & index
-			objects.get(objects.size() - 1).addVariableIndex(varName.substring(1));
-			objects.get(objects.size() - 1).addVariable(varDeclaration);
-
-			if (code.contains("(") && code.contains(")"))
-				executeCFunction(code.substring(code.indexOf('=') + 1, code.length()));
-
-		} else {
-			varName = code.substring(identifier.length());
-			varDeclaration = code + ";";
-
-			// It means that there was something after the declaration
-			// unsafe_char *name = "Hello, World"
-			objects.get(objects.size() - 1).addVariableIndex(varName.substring(1));
-			objects.get(objects.size() - 1)
-					.addVariable(identifier + " " + code.substring(identifier.length()) + ";");
-		}
-	}
-
 	private void executeImportIdentifier(String code) {
-		String thingToImport = code.substring(importIdentifier.length());
+		// Example: import basics
+		String thingToImport = splitSpecial(' ', code)[1];
 		if (thingToImport.contentEquals("basics")) {
 			headers += IMPORT_BASICS;
 		} else {
 			headers += "#include <" + thingToImport + ".h>";
 		}
-
-		System.out.println(headers);
-
+//		System.out.println(headers);
 	}
 
 	private void executeReturnIdentifier(String code) {
-		objects.get(objects.size() - 1).add(returnIdentifier + " " + code.substring(returnIdentifier.length()) + ";");
+		// Example: return 5
+		String[] splitResult = splitSpecial(' ', code);
+		objects.get(objects.size() - 1).add(returnIdentifier + " " + splitResult[1] + ";");
 	}
 
 	private void executeEndIdentifier() {
+		// Example: end
 		if (scopeStatus >= 1)
 			objects.get(objects.size() - 1).add("}");
 
@@ -218,8 +269,56 @@ public class Compiler {
 			scopeStatus--;
 	}
 
+	///////// Very important functions here /////////
+
+	private int indexOfSpecial(char find, String str) {
+		boolean isQuote = false;
+		for (int i = 0; i < str.length(); i++) {
+			char letter = str.charAt(i);
+			if (letter == '"' || letter == '\'') {
+				isQuote = !isQuote;
+			} else if (!isQuote && letter == find) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private String[] splitSpecial(char find, String str) {
+		ArrayList<String> list = new ArrayList<>();
+		boolean isQuote = false;
+		int previousIndex = 0;
+		char previousChar;
+		if (str.length() > 0)
+			previousChar = str.charAt(0);
+		else
+			previousChar = ' ';
+
+		for (int i = 0; i < str.length(); i++) {
+			char letter = str.charAt(i);
+			if (letter == '"' || letter == '\'') {
+				isQuote = !isQuote;
+			} else if (!isQuote && letter == find && previousChar != find) {
+				list.add(str.substring(previousIndex, i));
+				previousIndex = i;
+			}
+			previousChar = letter;
+
+		}
+		list.add(str.substring(previousIndex + 1, str.length()));
+		return listToStringArray(list);
+	}
+
+	private String[] listToStringArray(List<String> arr) {
+		String[] strArray = new String[arr.size()];
+		for (int i = 0; i < strArray.length; i++) {
+			strArray[i] = arr.get(i);
+		}
+		return strArray;
+	}
+
 	/**
-	 * Cleans the line of any spaces if it is not in a quote
+	 * Cleans the line of any tabs if it is not in a quote
 	 * 
 	 * @param originalLine
 	 * @return
@@ -227,12 +326,20 @@ public class Compiler {
 	private String cleanLine(String originalLine) {
 		String newStr = "";
 		boolean inQuote = false;
+		boolean firstLetterReached = false;
 		for (int i = 0; i < originalLine.length(); i++) {
 			char letter = originalLine.charAt(i);
+			// Removes spaces and tabs until the first character
+			if (letter != ' ' && letter != '\t') {
+				firstLetterReached = true;
+			} else if (!firstLetterReached) {
+				continue;
+			}
+
 			if (letter == '"' || letter == '\'') {
 				inQuote = !inQuote;
 				newStr += letter;
-			} else if (!inQuote && letter != ' ' && letter != '\t') {
+			} else if (!inQuote && letter != '\t') {
 				newStr += letter;
 
 			} else if (inQuote) {
