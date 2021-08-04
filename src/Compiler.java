@@ -95,14 +95,11 @@ public class Compiler {
 
 					for (String cIdent : c_identifers) {
 						if (cleanOne.startsWith(cIdent)) {
+							System.out.println("C Identifier: " + cIdent);
 							executeCIdentifer(cIdent, cleanOne);
 							break;
 						}
 					}
-
-					// If nothing is found then
-					if (indexOfSpecial('(', cleanOne) != -1)
-						executeCFunction(cleanOne);
 				}
 			}
 		}

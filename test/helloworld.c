@@ -8,5 +8,4 @@ typedef struct {
 
 helloworld* helloworld_constructor(char *args){
 printf(args);
-printf(args);
 }
