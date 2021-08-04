@@ -4,7 +4,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class Compiler {
@@ -21,32 +20,24 @@ public class Compiler {
 	private String returnIdentifier = "return";
 
 	// C Identifiers
+	// GOAL: Inherits the C stuff and makes it safer from there
 	private String[] c_identifers = { "char*", "FILE", "long" };
-	private String[] c_functions = { "printf", "fopen", "fputs", "malloc" };
+	private String[] c_functions = { "fopen", "fprintf", "malloc" };
 
 	// Import stuff
 	private static final String IMPORT_BASICS = "#include <stdio.h>\n" + "#include <stdlib.h>\n"
 			+ "#include <stdbool.h>\n";
 
 	// Others
-	private String headers;
-	private int scopeStatus; // 0 = class, 1 = function
+	private String headers = "";
+	private boolean inConstructor = false;
+	private int scopeStatus = 0; // 0 = class, 1 = function
 
 	private List<HorseClass> objects;
 
-	/*
-	 * Currently, only one space is accepted!
-	 */
-
-	// Inherits the C stuff and makes it safer from there
 	public Compiler(String sourceFile) {
 		this.sourceFile = sourceFile;
-
 		objects = new ArrayList<>();
-
-		// Initializes the header string
-		headers = "";
-		scopeStatus = 0;
 	}
 
 	// c_printf()
@@ -112,8 +103,7 @@ public class Compiler {
 	}
 
 	private void executeCFunction(String code) {
-		// printf()
-		System.out.println("C Function encoutnered: " + code);
+		// fprintf()
 		String replaced = "";
 		if (code.contains("."))
 			replaced = code.replaceAll(".", "->");
@@ -161,33 +151,23 @@ public class Compiler {
 				current.addVariableIndex(splitResult[1]);
 			}
 		}
-		// Reset all indicators now on
+		// Reset all necessary indicators
 		headers = "";
 		scopeStatus = 0;
 	}
 
 	private void executeConstructor(String code) {
-//		// constructor Hello()
-//		HorseClass current = objects.get(objects.size() - 1);
-//		String[] splitResult = code.split(" ", 2);
-//		String className = current.getName();
-//
-//		// It gets added to the typedef struct
-//
-//		current.addVariable(className + "* " + "(*" + splitResult[2].substring(0, splitResult[2].indexOf('(')) + ")_"
-//				+ splitResult + ";");
-//		current.addConstructorLine(className + "* " + className + "_");
-//		current.addConstructorLine(className + "*__" + className + "__obj = malloc(sizeof(" + className + "));");
-//
-//		// Parentheses adjuster to account for the end of class definition
-//		scopeStatus++;
-
-		// constructor Hello() -> name of the class
+		// constructor(char *arg)
 		String className = objects.get(objects.size() - 1).getName();
 		String argsWithParentheses = code.substring(constructorIdentifier.length());
-		objects.get(objects.size() - 1).add(
-				className + "* " + className.concat("_").concat(constructorIdentifier) + argsWithParentheses + "{");
 
+		HorseClass current = objects.get(objects.size() - 1);
+		current.addConstructorLine(
+				className + "_t* " + className.concat("_").concat(constructorIdentifier) + argsWithParentheses + "{");
+		current.addConstructorLine(
+				className + "_t* " + "__" + className + "__obj = " + "malloc(sizeof(" + className + "_t));");
+
+		inConstructor = true;
 		// Parentheses adjuster to account for the end of class definition
 		scopeStatus++;
 	}
@@ -208,14 +188,14 @@ public class Compiler {
 		if (!isCIdentifier(returnType)) {
 			returnType += "*";
 		}
-		// Add the fuction to the typedef struct & define it in the constructor
+		// Add the function to the typedef struct & define it in the constructor
 		HorseClass current = objects.get(objects.size() - 1);
 		String functionName = functionHeader.substring(0, functionHeader.indexOf('('));
-		current.add(returnType + " " + functionHeader + "{");
 		current.addVariable(
 				returnType + "(*" + functionName + ") " + functionHeader.substring(functionHeader.indexOf('(')) + ";");
 		current.addConstructorLine("__" + current.getName() + "__obj->" + functionName + "=&" + current.getName() + "_"
 				+ functionName + ";");
+		current.add(returnType + " " + functionHeader + "{");
 
 		// Change the current parentheses scope status to 1
 		scopeStatus++;
@@ -248,7 +228,6 @@ public class Compiler {
 		} else {
 			headers += "#include <" + thingToImport + ".h>";
 		}
-//		System.out.println(headers);
 	}
 
 	private void executeReturnIdentifier(String code) {
@@ -258,9 +237,16 @@ public class Compiler {
 	}
 
 	private void executeEndIdentifier() {
+		HorseClass current = objects.get(objects.size() - 1);
 		// Example: end
+		if (inConstructor) {
+			current.add("return __" + current.getName() + "__obj;");
+			inConstructor = false;
+		}
+			
+		
 		if (scopeStatus >= 1)
-			objects.get(objects.size() - 1).add("}");
+			current.add("}");
 
 		if (scopeStatus - 1 >= 0)
 			scopeStatus--;

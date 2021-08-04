@@ -3,6 +3,9 @@ import basics
 class helloworld
 	
 	constructor(char *args)
-		printf(args)
+		fprintf(stdout, "Hello World!\n")
+	end
+	
+	function startSomewhere() returns long
 	end
 end
