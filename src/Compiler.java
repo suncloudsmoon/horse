@@ -13,7 +13,6 @@ public class Compiler {
 	// Function Identifiers
 	private String constructorIdentifier = "constructor";
 	private String importIdentifier = "import";
-	private String longIdentifier = "long";
 	private String classIdentifier = "class";
 	private String voidIdentifier = "void";
 	private String functionIdentifer = "function";
@@ -77,9 +76,11 @@ public class Compiler {
 					executeEndIdentifier();
 
 				} else {
+					boolean isSomething = false;
 					for (String cfunc : c_functions) {
 						if (cleanOne.startsWith(cfunc)) {
 							executeCFunction(cleanOne);
+							isSomething = true;
 							break;
 						}
 					}
@@ -88,9 +89,18 @@ public class Compiler {
 						if (cleanOne.startsWith(cIdent)) {
 							System.out.println("C Identifier: " + cIdent);
 							executeCIdentifer(cIdent, cleanOne);
+							isSomething = true;
 							break;
 						}
 					}
+					
+					HorseClass current = objects.get(objects.size() - 1);
+					if (!isSomething && inConstructor) {
+						current.addConstructorLine(cleanOne + ";");
+					} else {
+						current.add(cleanOne + ";");
+					}
+					
 				}
 			}
 		}
@@ -117,11 +127,13 @@ public class Compiler {
 		String[] splitResult = splitSpecial('=', code);
 		if (splitResult.length >= 1) {
 			// only char *name is present
-			objects.get(objects.size() - 1).addVariable(splitResult[0] + ";");
+			HorseClass current = objects.get(objects.size() - 1);
+			current.addVariable(splitResult[0] + ";");
+			System.out.println("SPLITRESULT: " + splitResult[0]);
 			String[] identifierSplit = code.split(" ");
-			objects.get(objects.size() - 1).addVariableIndex(identifierSplit[0]);
+			current.addVariableIndex(identifierSplit[0]);
 
-			if (splitResult.length == 2) {
+			if (splitResult.length == 3) {
 				// char *name = malloc()
 				// char *name = previousName
 				if (indexOfSpecial('(', splitResult[1]) != -1) {
@@ -129,10 +141,12 @@ public class Compiler {
 					// substring(1) for accounting for the extra space in between
 					executeCFunction(splitResult[1].substring(1));
 				} else {
-					objects.get(objects.size() - 1)
-							.addVariable(identifierSplit[1] + " = " + splitResult[1].substring(1) + ";");
+					String identifierWithoutPointer = identifierSplit[1].contains("*") ? identifierSplit[1].substring(1)
+							: identifierSplit[1];
+					current.addVariable(identifierWithoutPointer + " = " + splitResult[1] + ";");
 				}
 			}
+
 		}
 	}
 
@@ -243,8 +257,7 @@ public class Compiler {
 			current.add("return __" + current.getName() + "__obj;");
 			inConstructor = false;
 		}
-			
-		
+
 		if (scopeStatus >= 1)
 			current.add("}");
 
@@ -253,19 +266,6 @@ public class Compiler {
 	}
 
 	///////// Very important functions here /////////
-
-	private int indexOfSpecial(char find, String str) {
-		boolean isQuote = false;
-		for (int i = 0; i < str.length(); i++) {
-			char letter = str.charAt(i);
-			if (letter == '"' || letter == '\'') {
-				isQuote = !isQuote;
-			} else if (!isQuote && letter == find) {
-				return i;
-			}
-		}
-		return -1;
-	}
 
 	private String[] splitSpecial(char find, String str) {
 		ArrayList<String> list = new ArrayList<>();
@@ -288,8 +288,25 @@ public class Compiler {
 			previousChar = letter;
 
 		}
-		list.add(str.substring(previousIndex + 1, str.length()));
+		int addNum = 1;
+		if (previousIndex == 0 && str.charAt(previousIndex) != find)
+			addNum = 0;
+		list.add(str.substring(previousIndex + addNum, str.length()));
+
 		return listToStringArray(list);
+	}
+
+	private int indexOfSpecial(char find, String str) {
+		boolean isQuote = false;
+		for (int i = 0; i < str.length(); i++) {
+			char letter = str.charAt(i);
+			if (letter == '"' || letter == '\'') {
+				isQuote = !isQuote;
+			} else if (!isQuote && letter == find) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	private String[] listToStringArray(List<String> arr) {

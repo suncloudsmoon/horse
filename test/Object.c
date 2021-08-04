@@ -1,8 +1,13 @@
 
 typedef struct {
+long hashCode;
 
-} Object;
+} Object_t;
 
-long Object_toString(){
-return 5;
+Object_t* Object_constructor(){
+Object_t* __Object__obj = malloc(sizeof(Object_t));
+hashCode = 5;
+
+long hashCode;
+return __Object__obj;
 }

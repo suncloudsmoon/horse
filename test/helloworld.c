@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 typedef struct {
-long(*startSomewhere) () ;
+Object*(*startSomewhere) () ;
 
 } helloworld_t;
 
@@ -12,7 +12,8 @@ helloworld_t* __helloworld__obj = malloc(sizeof(helloworld_t));
 __helloworld__obj->startSomewhere=&helloworld_startSomewhere;
 
 fprintf(stdout, "Hello World!\n");
+fprintf(stdout, "Hello World!\n");
 return __helloworld__obj;
 }
-long startSomewhere() {
+Object* startSomewhere() {
 }
