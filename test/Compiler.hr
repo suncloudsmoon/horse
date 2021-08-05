@@ -1,0 +1,63 @@
+// Very basic OOP Stuff
+// It isn't complete, but it is enough for bootstrapping
+import basics
+
+class Compiler
+	
+	constructor(char *args)
+		
+	end
+
+	function main() returns void
+		IO output = new IO()
+		output.print("Hello World!!!!!!")
+	end
+	
+	function startSomewhere() returns Object
+		printf()
+	end
+end
+
+class String extends Object
+	char* text
+	long length
+	long allocatedLength
+	
+	constructor() 
+		str = malloc(10 * sizeof(char))
+		length = 0
+		allocatedLength = 10
+	end
+	
+	function append(char* extra) returns void
+		strcat(text, extra)
+	end
+
+	function charAt(long index) returns char
+		return text[index]
+	end
+
+end
+
+class IO extends Object
+
+	constructor()
+
+	end
+
+	function print(char* text, ...) returns long
+		va_list args
+		va_start(args, text)
+		vfprintf(stdout, text, args)
+		va_end(args)
+	end
+end
+
+class Object
+	// Global variables
+	long hashCode
+	
+	constructor()
+		hashCode = 1
+	end
+end

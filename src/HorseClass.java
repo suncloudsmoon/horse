@@ -14,8 +14,6 @@ public class HorseClass {
 	private List<String> compiledLines;
 	private List<String> constructorLines;
 
-	private int constuctorLineBeginning = -1;
-
 	public HorseClass(String name, String header) {
 		this.name = name;
 		this.header = header;
@@ -38,10 +36,11 @@ public class HorseClass {
 	 * @param line
 	 */
 	public void addConstructorLine(String line) {
-		if (constuctorLineBeginning == -1)
-			constuctorLineBeginning = compiledLines.size() - 1;
-
 		constructorLines.add(line);
+	}
+	
+	public void addConstructorLineAt(int index, String line) {
+		constructorLines.add(index, line);
 	}
 
 	/**

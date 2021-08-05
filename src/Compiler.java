@@ -20,8 +20,8 @@ public class Compiler {
 
 	// C Identifiers
 	// GOAL: Inherits the C stuff and makes it safer from there
-	private String[] c_identifers = { "char*", "FILE", "long" };
-	private String[] c_functions = { "fopen", "fprintf", "malloc" };
+	private String[] c_identifers = { "void", "char*", "FILE", "long" };
+	private String[] c_functions = { "fopen", "fprintf", "malloc", "strcat"};
 
 	// Import stuff
 	private static final String IMPORT_BASICS = "#include <stdio.h>\n" + "#include <stdlib.h>\n"
@@ -94,13 +94,18 @@ public class Compiler {
 						}
 					}
 					
+					if (isSomething)
+						continue;
+
+					// If nothing is found, then just use the cleanOne string with a semicolon
 					HorseClass current = objects.get(objects.size() - 1);
-					if (!isSomething && inConstructor) {
-						current.addConstructorLine(cleanOne + ";");
+					String classStuff = current.getName() + "->";
+					if (inConstructor) {
+						current.addConstructorLine(classStuff + cleanOne.replaceAll("\\.", "->") + ";");
 					} else {
-						current.add(cleanOne + ";");
+						current.add(classStuff + cleanOne.replaceAll("\\.", "->") + ";");
 					}
-					
+
 				}
 			}
 		}
@@ -126,10 +131,9 @@ public class Compiler {
 		// Example: char *name = malloc()
 		String[] splitResult = splitSpecial('=', code);
 		if (splitResult.length >= 1) {
-			// only char *name is present
+			// so far char *name is guaranteed to be present
 			HorseClass current = objects.get(objects.size() - 1);
 			current.addVariable(splitResult[0] + ";");
-			System.out.println("SPLITRESULT: " + splitResult[0]);
 			String[] identifierSplit = code.split(" ");
 			current.addVariableIndex(identifierSplit[0]);
 
@@ -161,8 +165,11 @@ public class Compiler {
 			if (splitResult.length == 4) {
 				// class Name extends Object
 				HorseClass current = objects.get(objects.size() - 1);
-				current.addVariable(splitResult[1] + " *__extends;");
+				current.addVariable(splitResult[3] + " *__extends;");
 				current.addVariableIndex(splitResult[1]);
+				
+				// Add __extends to the constructor
+				current.addConstructorLine("__extends = " + splitResult[3] + "_constructor();");
 			}
 		}
 		// Reset all necessary indicators
@@ -176,7 +183,7 @@ public class Compiler {
 		String argsWithParentheses = code.substring(constructorIdentifier.length());
 
 		HorseClass current = objects.get(objects.size() - 1);
-		current.addConstructorLine(
+		current.addConstructorLineAt(0,
 				className + "_t* " + className.concat("_").concat(constructorIdentifier) + argsWithParentheses + "{");
 		current.addConstructorLine(
 				className + "_t* " + "__" + className + "__obj = " + "malloc(sizeof(" + className + "_t));");
@@ -205,11 +212,15 @@ public class Compiler {
 		// Add the function to the typedef struct & define it in the constructor
 		HorseClass current = objects.get(objects.size() - 1);
 		String functionName = functionHeader.substring(0, functionHeader.indexOf('('));
+		String className = current.getName() + "_";
+		if (functionName.contentEquals("main")) {
+			className = "";
+		}
 		current.addVariable(
 				returnType + "(*" + functionName + ") " + functionHeader.substring(functionHeader.indexOf('(')) + ";");
-		current.addConstructorLine("__" + current.getName() + "__obj->" + functionName + "=&" + current.getName() + "_"
+		current.addConstructorLine("__" + current.getName() + "__obj->" + functionName + "=&" + className
 				+ functionName + ";");
-		current.add(returnType + " " + functionHeader + "{");
+		current.add(returnType + " " + className + functionHeader + "{");
 
 		// Change the current parentheses scope status to 1
 		scopeStatus++;

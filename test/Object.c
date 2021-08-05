@@ -6,8 +6,7 @@ long hashCode;
 
 Object_t* Object_constructor(){
 Object_t* __Object__obj = malloc(sizeof(Object_t));
-hashCode = 5;
+Object->hashCode = 1;
 
-long hashCode;
 return __Object__obj;
 }
