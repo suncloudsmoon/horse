@@ -21,7 +21,7 @@ public class Compiler {
 	// C Identifiers
 	// GOAL: Inherits the C stuff and makes it safer from there
 	private String[] c_identifers = { "void", "char*", "FILE", "long" };
-	private String[] c_functions = { "fopen", "fprintf", "malloc", "strcat"};
+	private String[] c_functions = { "fopen", "fprintf", "malloc", "strcat" };
 
 	// Import stuff
 	private static final String IMPORT_BASICS = "#include <stdio.h>\n" + "#include <stdlib.h>\n"
@@ -88,12 +88,21 @@ public class Compiler {
 					for (String cIdent : c_identifers) {
 						if (cleanOne.startsWith(cIdent)) {
 							System.out.println("C Identifier: " + cIdent);
-							executeCIdentifer(cIdent, cleanOne);
+							executeIdentifer(cleanOne);
 							isSomething = true;
 							break;
 						}
 					}
-					
+
+					for (int i = 0; i < objects.size(); i++) {
+						HorseClass current = objects.get(i);
+						if (cleanOne.startsWith(current.getName())) {
+							executeIdentifer(cleanOne);
+							isSomething = true;
+							break;
+						}
+					}
+
 					if (isSomething)
 						continue;
 
@@ -127,31 +136,32 @@ public class Compiler {
 		objects.get(objects.size() - 1).add(replaced + ";");
 	}
 
-	private void executeCIdentifer(String identifier, String code) {
+	private void executeIdentifer(String code) {
 		// Example: char *name = malloc()
-		String[] splitResult = splitSpecial('=', code);
-		if (splitResult.length >= 1) {
-			// so far char *name is guaranteed to be present
-			HorseClass current = objects.get(objects.size() - 1);
-			current.addVariable(splitResult[0] + ";");
-			String[] identifierSplit = code.split(" ");
-			current.addVariableIndex(identifierSplit[0]);
+		String[] splitResult = splitSpecial(' ', code);
+		if (splitResult.length <= 1)
+			return;
 
-			if (splitResult.length == 3) {
-				// char *name = malloc()
-				// char *name = previousName
-				if (indexOfSpecial('(', splitResult[1]) != -1) {
-					// then there is a function here!
-					// substring(1) for accounting for the extra space in between
-					executeCFunction(splitResult[1].substring(1));
-				} else {
-					String identifierWithoutPointer = identifierSplit[1].contains("*") ? identifierSplit[1].substring(1)
-							: identifierSplit[1];
-					current.addVariable(identifierWithoutPointer + " = " + splitResult[1] + ";");
-				}
+		// so far char *name is guaranteed to be present
+		HorseClass current = objects.get(objects.size() - 1);
+
+		if (splitResult.length == 3) {
+			// char *name = malloc() or char *name = previousName
+			if (indexOfSpecial('(', splitResult[1]) != -1) {
+				// substring(1) for accounting for the extra space in between
+				executeCFunction(splitResult[1].substring(1));
+			} else {
+				String identifierWithoutPointer = splitResult[1].contains("*") ? splitResult[1].substring(1)
+						: splitResult[1];
+				current.add(identifierWithoutPointer + " = " + splitResult[1] + ";");
 			}
-
+		} else if (splitResult.length == 5) {
+			// IO i = new IO()
+			current.add(splitResult[0] + "*" + splitResult[1] + "=" + splitResult[4] + ";");
+			return;
 		}
+		current.addVariable(splitResult[0] + ";");
+		current.addVariableIndex(splitResult[1]);
 	}
 
 	// Class/Object Functions
@@ -167,7 +177,7 @@ public class Compiler {
 				HorseClass current = objects.get(objects.size() - 1);
 				current.addVariable(splitResult[3] + " *__extends;");
 				current.addVariableIndex(splitResult[1]);
-				
+
 				// Add __extends to the constructor
 				current.addConstructorLine("__extends = " + splitResult[3] + "_constructor();");
 			}
@@ -218,8 +228,8 @@ public class Compiler {
 		}
 		current.addVariable(
 				returnType + "(*" + functionName + ") " + functionHeader.substring(functionHeader.indexOf('(')) + ";");
-		current.addConstructorLine("__" + current.getName() + "__obj->" + functionName + "=&" + className
-				+ functionName + ";");
+		current.addConstructorLine(
+				"__" + current.getName() + "__obj->" + functionName + "=&" + className + functionName + ";");
 		current.add(returnType + " " + className + functionHeader + "{");
 
 		// Change the current parentheses scope status to 1

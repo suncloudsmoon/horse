@@ -2,19 +2,12 @@
 // It isn't complete, but it is enough for bootstrapping
 import basics
 
-class Compiler
+class Object
+	// Global variables
+	long hashCode
 	
-	constructor(char *args)
-		
-	end
-
-	function main() returns void
-		IO output = new IO()
-		output.print("Hello World!!!!!!")
-	end
-	
-	function startSomewhere() returns Object
-		printf()
+	constructor()
+		hashCode = 1
 	end
 end
 
@@ -53,11 +46,18 @@ class IO extends Object
 	end
 end
 
-class Object
-	// Global variables
-	long hashCode
+class Compiler
 	
-	constructor()
-		hashCode = 1
+	constructor(char *args)
+		
+	end
+
+	function main() returns void
+		IO output = new IO()
+		output.print("Hello World!!!!!!")
+	end
+	
+	function startSomewhere() returns Object
+		printf()
 	end
 end

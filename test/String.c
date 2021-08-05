@@ -1,9 +1,9 @@
 
 typedef struct {
 Object *__extends;
-char* text;
-long length;
-long allocatedLength;
+char*;
+long;
+long;
 void(*append) (char* extra) ;
 char*(*charAt) (long index) ;
 

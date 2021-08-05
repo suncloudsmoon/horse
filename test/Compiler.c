@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
 
 typedef struct {
 void(*main) () ;
@@ -16,7 +13,7 @@ __Compiler__obj->startSomewhere=&Compiler_startSomewhere;
 return __Compiler__obj;
 }
 void main() {
-Compiler->IO output = new IO();
+IO* output=IO();
 Compiler->output->print("Hello World!!!!!!");
 }
 Object* Compiler_startSomewhere() {
