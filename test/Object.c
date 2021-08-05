@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 typedef struct {
-long;
+long*hashCode;
 
 } Object_t;
 

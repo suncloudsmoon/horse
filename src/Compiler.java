@@ -157,10 +157,10 @@ public class Compiler {
 			}
 		} else if (splitResult.length == 5) {
 			// IO i = new IO()
-			current.add(splitResult[0] + "*" + splitResult[1] + "=" + splitResult[4] + ";");
-			return;
+			current.add(splitResult[1] + "=" + splitResult[4].substring(0, splitResult[4].indexOf('(')) + "_constructor"
+					+ splitResult[4].substring(splitResult[4].indexOf('(')) + ";");
 		}
-		current.addVariable(splitResult[0] + ";");
+		current.addVariable(splitResult[0] + "*" + splitResult[1] + ";");
 		current.addVariableIndex(splitResult[1]);
 	}
 

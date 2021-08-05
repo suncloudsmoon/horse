@@ -1,6 +1,7 @@
 
 typedef struct {
 void(*main) () ;
+IO* output;
 Object*(*startSomewhere) () ;
 
 } Compiler_t;
@@ -13,7 +14,7 @@ __Compiler__obj->startSomewhere=&Compiler_startSomewhere;
 return __Compiler__obj;
 }
 void main() {
-IO* output=IO();
+ output=IO_constructor();
 Compiler->output->print("Hello World!!!!!!");
 }
 Object* Compiler_startSomewhere() {
