@@ -4,6 +4,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Compiler {
@@ -108,7 +109,7 @@ public class Compiler {
 
 					// If nothing is found, then just use the cleanOne string with a semicolon
 					HorseClass current = objects.get(objects.size() - 1);
-					String classStuff = current.getName() + "->";
+					String classStuff = "__" + current.getName() + "__obj" + "->";
 					if (inConstructor) {
 						current.addConstructorLine(classStuff + cleanOne.replaceAll("\\.", "->") + ";");
 					} else {
@@ -159,8 +160,12 @@ public class Compiler {
 			// IO i = new IO()
 			current.add(splitResult[1] + "=" + splitResult[4].substring(0, splitResult[4].indexOf('(')) + "_constructor"
 					+ splitResult[4].substring(splitResult[4].indexOf('(')) + ";");
+			// Custom variable addition
+			current.addVariable(splitResult[0] + "*" + splitResult[1] + ";");
+			current.addVariableIndex(splitResult[1]);
+			return;
 		}
-		current.addVariable(splitResult[0] + "*" + splitResult[1] + ";");
+		current.addVariable(splitResult[0] + " " + splitResult[1] + ";");
 		current.addVariableIndex(splitResult[1]);
 	}
 
@@ -168,20 +173,29 @@ public class Compiler {
 	private void executeClassIdentifier(String code) {
 		// Example: class Name extends Object
 		String[] splitResult = code.split(" ");
+		System.out.println("SPLIT RESULT: " + Arrays.asList(splitResult));
 		if (splitResult.length >= 2) {
 			// class Name
-			objects.add(new HorseClass(splitResult[1], headers));
+			HorseClass newObj = new HorseClass(splitResult[1], headers);
+			objects.add(newObj);
+			newObj.addConstructorLine("");
 
 			if (splitResult.length == 4) {
 				// class Name extends Object
-				HorseClass current = objects.get(objects.size() - 1);
-				current.addVariable(splitResult[3] + " *__extends;");
-				current.addVariableIndex(splitResult[1]);
+
+				newObj.addVariable(splitResult[3] + "_t *__extends;");
+				newObj.addVariableIndex(splitResult[1]);
 
 				// Add __extends to the constructor
-				current.addConstructorLine("__extends = " + splitResult[3] + "_constructor();");
+
+				newObj.addConstructorLine(
+						"__" + newObj.getName() + "__obj->__extends = " + splitResult[3] + "_constructor();");
 			}
 		}
+		resetClass();
+	}
+
+	private void resetClass() {
 		// Reset all necessary indicators
 		headers = "";
 		scopeStatus = 0;
@@ -194,9 +208,9 @@ public class Compiler {
 
 		HorseClass current = objects.get(objects.size() - 1);
 		current.addConstructorLineAt(0,
-				className + "_t* " + className.concat("_").concat(constructorIdentifier) + argsWithParentheses + "{");
-		current.addConstructorLine(
 				className + "_t* " + "__" + className + "__obj = " + "malloc(sizeof(" + className + "_t));");
+		current.addConstructorLineAt(0,
+				className + "_t* " + className.concat("_").concat(constructorIdentifier) + argsWithParentheses + "{");
 
 		inConstructor = true;
 		// Parentheses adjuster to account for the end of class definition
@@ -261,7 +275,8 @@ public class Compiler {
 		if (thingToImport.contentEquals("basics")) {
 			headers += IMPORT_BASICS;
 		} else {
-			headers += "#include <" + thingToImport + ".h>";
+			// TODO: change .c to .h and move stuff to header files soon
+			headers += "#include \"" + thingToImport + ".c\"\n";
 		}
 	}
 

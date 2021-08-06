@@ -1,15 +1,44 @@
 // Very basic OOP Stuff
 // It isn't complete, but it is enough for bootstrapping
-import basics
 
-class Object
-	// Global variables
-	long hashCode
+import basics
+import IO
+
+class Compiler
 	
-	constructor()
-		hashCode = 1
+	constructor(char *args)
+		
+	end
+
+	function main() returns void
+		IO output = new IO()
+		output.print("Hello World!!!!!!")
+	end
+	
+	function startSomewhere() returns Object
+		printf()
 	end
 end
+
+import basics
+import String
+
+class IO extends Object
+
+	constructor()
+
+	end
+
+	function print(char* text, ...) returns long
+		va_list args
+		va_start(args, text)
+		vfprintf(stdout, text, args)
+		va_end(args)
+	end
+end
+
+import basics
+import Object
 
 class String extends Object
 	char* text
@@ -32,32 +61,12 @@ class String extends Object
 
 end
 
-class IO extends Object
-
+import basics
+class Object
+	// Global variables
+	long hashCode
+	
 	constructor()
-
-	end
-
-	function print(char* text, ...) returns long
-		va_list args
-		va_start(args, text)
-		vfprintf(stdout, text, args)
-		va_end(args)
-	end
-end
-
-class Compiler
-	
-	constructor(char *args)
-		
-	end
-
-	function main() returns void
-		IO output = new IO()
-		output.print("Hello World!!!!!!")
-	end
-	
-	function startSomewhere() returns Object
-		printf()
+		hashCode = 1
 	end
 end
