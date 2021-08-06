@@ -13,6 +13,7 @@ public class HorseClass {
 
 	private List<String> compiledLines;
 	private List<String> constructorLines;
+	private String endOfConstructor;
 
 	public HorseClass(String name, String header) {
 		this.name = name;
@@ -58,7 +59,10 @@ public class HorseClass {
 	}
 
 	public String getPackage() {
-		return header + "\n" + getAllAttributes() + "\n" + getConstructor() + "\n" + getRestOfTheLines();
+		// For now, getConstructor() is at the last line so we don't have to write prototypes
+		// TODO: fix this method
+		 return header + "\n" + getAllAttributes() + "\n" + getRestOfTheLines() + "\n" + getConstructor();
+		// return header + "\n" + getAllAttributes() + "\n" + getConstructor() + "\n" + getRestOfTheLines() + "\n";
 	}
 
 	private String getAllAttributes() {
@@ -75,6 +79,7 @@ public class HorseClass {
 		String fullSource = "";
 		for (String line : constructorLines)
 			fullSource += line + "\n";
+		fullSource += endOfConstructor;
 		return fullSource;
 	}
 
@@ -95,4 +100,26 @@ public class HorseClass {
 	public String getName() {
 		return name;
 	}
+
+	/**
+	 * @return the endOfConstructor
+	 */
+	public String getEndOfConstructor() {
+		return endOfConstructor;
+	}
+
+	/**
+	 * @param endOfConstructor the endOfConstructor to set
+	 */
+	public void setEndOfConstructor(String endOfConstructor) {
+		this.endOfConstructor = endOfConstructor;
+	}
+
+	/**
+	 * @return the variableIndexList
+	 */
+	public List<String> getVariableIndexList() {
+		return variableIndexList;
+	}
+	
 }

@@ -2,38 +2,12 @@
 // It isn't complete, but it is enough for bootstrapping
 
 import basics
-import IO
-
-class Compiler
+class Object
+	// Global variables
+	long hashCode
 	
-	constructor(char *args)
-		
-	end
-
-	function main() returns void
-		IO output = new IO()
-		output.print("Hello World!!!!!!")
-	end
-	
-	function startSomewhere() returns Object
-		printf()
-	end
-end
-
-import basics
-import String
-
-class IO extends Object
-
 	constructor()
-
-	end
-
-	function print(char* text, ...) returns long
-		va_list args
-		va_start(args, text)
-		vfprintf(stdout, text, args)
-		va_end(args)
+		hashCode = 1
 	end
 end
 
@@ -52,6 +26,7 @@ class String extends Object
 	end
 	
 	function append(char* extra) returns void
+		// put __String_obj before every variable except if it is "extra"
 		strcat(text, extra)
 	end
 
@@ -62,11 +37,34 @@ class String extends Object
 end
 
 import basics
-class Object
-	// Global variables
-	long hashCode
-	
+import String
+
+class IO extends Object
+
 	constructor()
-		hashCode = 1
+
+	end
+
+	function print(char* text) returns long
+		fprintf(stdout, "%s\n", text)
+	end
+end
+
+import basics
+import IO
+
+class Compiler
+	
+	constructor(char *args)
+		
+	end
+
+	function main() returns void
+		IO output = new IO()
+		output.print("Hello World!!!!!!")
+	end
+	
+	function startSomewhere() returns Object
+		printf()
 	end
 end

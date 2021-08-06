@@ -129,12 +129,35 @@ public class Compiler {
 
 	private void executeCFunction(String code) {
 		// fprintf()
-		String replaced = "";
-		if (code.contains("."))
-			replaced = code.replaceAll(".", "->");
-		else
-			replaced = code;
-		objects.get(objects.size() - 1).add(replaced + ";");
+		String formattedCode = code.replaceAll("\\.", "->");
+		int paranthesisIndex = indexOfSpecial('(', formattedCode);
+		String functionName = code.substring(0, paranthesisIndex);
+		String parameters = code.substring(paranthesisIndex + 1, indexOfSpecial(')', formattedCode));
+		String[] parameterList = splitSpecial(',', parameters);
+
+		String fullFunctionDetails = functionName + "(";
+		HorseClass current = objects.get(objects.size() - 1);
+		List<String> varList = current.getVariableIndexList();
+		for (int i = 0; i < parameterList.length; i++) {
+			String var = parameterList[i];
+			if (isVariable(var))
+				fullFunctionDetails += "__" + objects.get(objects.size() - 1).getName() + "__obj->" + var;
+			else
+				fullFunctionDetails += var;
+
+			if (i != parameterList.length - 1)
+				fullFunctionDetails += ",";
+		}
+		fullFunctionDetails += ");";
+
+		current.add(fullFunctionDetails);
+	}
+
+	private boolean isVariable(String variable) {
+		for (String var : objects.get(objects.size() - 1).getVariableIndexList())
+			if (variable.contentEquals(var))
+				return true;
+		return false;
 	}
 
 	private void executeIdentifer(String code) {
@@ -252,7 +275,7 @@ public class Compiler {
 
 	private void executeIfFunction(String code) {
 		// if 5 == 5 then
-		String ifheader = "if (" + code.substring("if".length() + 2, code.lastIndexOf("then")).replaceAll(".", "->")
+		String ifheader = "if (" + code.substring("if".length() + 2, code.lastIndexOf("then")).replaceAll("\\.", "->")
 				+ ") {";
 		objects.get(objects.size() - 1).add(ifheader);
 
@@ -290,8 +313,10 @@ public class Compiler {
 		HorseClass current = objects.get(objects.size() - 1);
 		// Example: end
 		if (inConstructor) {
-			current.add("return __" + current.getName() + "__obj;");
+			current.setEndOfConstructor("return __" + current.getName() + "__obj;\n}\n");
 			inConstructor = false;
+			scopeStatus--;
+			return;
 		}
 
 		if (scopeStatus >= 1)

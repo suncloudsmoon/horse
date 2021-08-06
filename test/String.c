@@ -13,6 +13,13 @@ char*(*charAt) (long index) ;
 
 } String_t;
 
+void String_append(char* extra) {
+strcat(__String__obj->text, extra);
+}
+char* String_charAt(long index) {
+return text[index];
+}
+
 String_t* String_constructor() {
 String_t* __String__obj = malloc(sizeof(String_t));
 
@@ -22,12 +29,5 @@ __String__obj->length = 0;
 __String__obj->allocatedLength = 10;
 __String__obj->append=&String_append;
 __String__obj->charAt=&String_charAt;
-
 return __String__obj;
-}
-void String_append(char* extra) {
-strcat(text, extra);
-}
-char* String_charAt(long index) {
-return text[index];
 }
