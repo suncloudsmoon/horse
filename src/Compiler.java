@@ -110,7 +110,7 @@ public class Compiler {
 	private void generalBehavior(String cleanOne) {
 		HorseClass current = objects.get(objects.size() - 1);
 		String addStr = "";
-		
+
 		System.out.println("General Behavor: " + cleanOne);
 
 		addStr = (indexOfSpecial('(', cleanOne) != -1) ? dealWithFunctionCalls(cleanOne) : cleanOne + ";";
@@ -307,16 +307,15 @@ public class Compiler {
 
 		String parameters = "(" + current.getName() + "_t* __" + current.getName() + "__obj";
 		int paranthesisIndex = indexOfSpecial('(', code);
-		if (code.charAt(paranthesisIndex + 1) != ')') {
-			parameters = "," + splitResult[0].substring(indexOfSpecial('(', splitResult[0]) + 1);
+		if (splitSpecial(',', code.substring(code.indexOf('(') + 1, code.indexOf(')'))).length >= 1) {
+			parameters += ",";
 		}
-		parameters += splitResult[0].substring(indexOfSpecial('(', splitResult[0]) + 1);
+		parameters += splitResult[0].substring(splitResult[0].indexOf('(') + 1);
 
 		if (functionName.contentEquals("main")) {
 			className = "";
 			parameters = splitResult[0].substring(indexOfSpecial('(', splitResult[0]));
 		}
-
 		current.addVariable(returnType + "(*" + functionName + ") " + parameters + ";");
 		current.addConstructorLine(
 				"__" + current.getName() + "__obj->" + functionName + "=&" + className + functionName + ";");

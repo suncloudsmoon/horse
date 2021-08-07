@@ -20,7 +20,8 @@ class String extends Object
 	long allocatedLength
 	
 	constructor() 
-		str = malloc(10 * sizeof(char))
+		// Paranthesis must take the last index of
+		text = malloc(10 * sizeof(char))
 		length = 0
 		allocatedLength = 10
 	end
