@@ -6,11 +6,11 @@ typedef struct {
 
 } Object_t;
 
-long hashCode
+long hashCode;
 
 Object_t* Object_constructor(){
 Object_t* __Object__obj = malloc(sizeof(Object_t));
 
-hashCode = 1
+hashCode = 1;
 return __Object__obj;
 }

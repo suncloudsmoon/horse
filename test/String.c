@@ -10,9 +10,9 @@ char*(*charAt) ,long index) long index) ;
 
 } String_t;
 
-char* text
-long length
-long allocatedLength
+char* text;
+long length;
+long allocatedLength;
 void String_append,char* extra) char* extra) {
 strcat(text, extra);
 }
@@ -25,8 +25,8 @@ String_t* __String__obj = malloc(sizeof(String_t));
 
 __String__obj->__extends = Object_constructor();
 str = malloc(_String__obj,10 * sizeof(char);
-length = 0
-allocatedLength = 10
+length = 0;
+allocatedLength = 10;
 __String__obj->append=&String_append;
 __String__obj->charAt=&String_charAt;
 return __String__obj;

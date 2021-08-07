@@ -75,7 +75,6 @@ public class Compiler {
 
 				} else {
 					boolean isSomething = false;
-
 					for (String cIdent : c_identifers) {
 						if (cleanOne.startsWith(cIdent) && indexOfSpecial('=', cleanOne) != -1) {
 							executeIdentifer(cleanOne);
@@ -83,7 +82,6 @@ public class Compiler {
 							break;
 						}
 					}
-
 					for (int i = 0; i < objects.size(); i++) {
 						HorseClass current = objects.get(i);
 						if (cleanOne.startsWith(current.getName())) {
@@ -92,13 +90,11 @@ public class Compiler {
 							break;
 						}
 					}
-
 					if (isSomething)
 						continue;
 
 					// If nothing is found, then just use the cleanOne string with a semicolon
 					generalBehavior(cleanOne);
-
 				}
 			}
 		}
@@ -114,8 +110,10 @@ public class Compiler {
 	private void generalBehavior(String cleanOne) {
 		HorseClass current = objects.get(objects.size() - 1);
 		String addStr = "";
+		
+		System.out.println("General Behavor: " + cleanOne);
 
-		addStr = (indexOfSpecial('(', cleanOne) != -1) ? dealWithFunctionCalls(cleanOne) : cleanOne;
+		addStr = (indexOfSpecial('(', cleanOne) != -1) ? dealWithFunctionCalls(cleanOne) : cleanOne + ";";
 		if (inConstructor)
 			current.addConstructorLine(addStr);
 		else
