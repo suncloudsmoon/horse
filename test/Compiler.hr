@@ -59,12 +59,8 @@ class Compiler
 		
 	end
 
-	function main() returns void
+	function main(char *args) returns void
 		IO output = new IO()
 		output.print("Hello World!!!!!!")
-	end
-	
-	function startSomewhere() returns Object
-		printf()
 	end
 end

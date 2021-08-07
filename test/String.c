@@ -5,18 +5,18 @@
 
 typedef struct {
 Object_t *__extends;
-char* text;
-long length;
-long allocatedLength;
-void(*append) (char* extra) ;
-char*(*charAt) (long index) ;
+void(*append) ,char* extra) char* extra) ;
+char*(*charAt) ,long index) long index) ;
 
 } String_t;
 
-void String_append(char* extra) {
-strcat(__String__obj->text, extra);
+char* text
+long length
+long allocatedLength
+void String_append,char* extra) char* extra) {
+strcat(text, extra);
 }
-char* String_charAt(long index) {
+char* String_charAt,long index) long index) {
 return text[index];
 }
 
@@ -24,9 +24,9 @@ String_t* String_constructor() {
 String_t* __String__obj = malloc(sizeof(String_t));
 
 __String__obj->__extends = Object_constructor();
-__String__obj->str = malloc(10 * sizeof(char));
-__String__obj->length = 0;
-__String__obj->allocatedLength = 10;
+str = malloc(_String__obj,10 * sizeof(char);
+length = 0
+allocatedLength = 10
 __String__obj->append=&String_append;
 __String__obj->charAt=&String_charAt;
 return __String__obj;

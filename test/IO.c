@@ -5,12 +5,12 @@
 
 typedef struct {
 Object_t *__extends;
-long(*print) (char* text) ;
+long(*print) ,char* text) char* text) ;
 
 } IO_t;
 
-long IO_print(char* text) {
-fprintf(stdout,, "%s\n", text);
+long IO_print,char* text) char* text) {
+fprintf(stdout, "%s\n", text);
 }
 
 IO_t* IO_constructor(){

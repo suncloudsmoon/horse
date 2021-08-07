@@ -4,7 +4,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Compiler {
@@ -47,8 +46,6 @@ public class Compiler {
 			while ((line = r.readLine()) != null) {
 				String cleanOne = cleanLine(line);
 
-				System.out.println("Clean One: " + cleanOne);
-
 				if (cleanOne.isEmpty() || cleanOne.startsWith("//"))
 					continue;
 
@@ -78,17 +75,9 @@ public class Compiler {
 
 				} else {
 					boolean isSomething = false;
-					for (String cfunc : c_functions) {
-						if (cleanOne.startsWith(cfunc)) {
-							executeCFunction(cleanOne);
-							isSomething = true;
-							break;
-						}
-					}
 
 					for (String cIdent : c_identifers) {
-						if (cleanOne.startsWith(cIdent)) {
-							System.out.println("C Identifier: " + cIdent);
+						if (cleanOne.startsWith(cIdent) && indexOfSpecial('=', cleanOne) != -1) {
 							executeIdentifer(cleanOne);
 							isSomething = true;
 							break;
@@ -108,18 +97,13 @@ public class Compiler {
 						continue;
 
 					// If nothing is found, then just use the cleanOne string with a semicolon
-					HorseClass current = objects.get(objects.size() - 1);
-					String classStuff = "__" + current.getName() + "__obj" + "->";
-					if (inConstructor) {
-						current.addConstructorLine(classStuff + cleanOne.replaceAll("\\.", "->") + ";");
-					} else {
-						current.add(classStuff + cleanOne.replaceAll("\\.", "->") + ";");
-					}
+					generalBehavior(cleanOne);
 
 				}
 			}
 		}
 
+		// Export the compiled C code in String to File
 		for (HorseClass cls : objects) {
 			try (FileWriter w = new FileWriter(Main.testOrNot + cls.getName() + ".c")) {
 				w.append(cls.getPackage());
@@ -127,30 +111,90 @@ public class Compiler {
 		}
 	}
 
-	private void executeCFunction(String code) {
+	private void generalBehavior(String cleanOne) {
+		HorseClass current = objects.get(objects.size() - 1);
+		String addStr = "";
+
+		addStr = (indexOfSpecial('(', cleanOne) != -1) ? dealWithFunctionCalls(cleanOne) : cleanOne;
+		if (inConstructor)
+			current.addConstructorLine(addStr);
+		else
+			current.add(addStr);
+	}
+
+	// TODO: implement try catch system
+	// TODO: do some documentation now
+
+	private String dealWithFunctionCalls(String code) {
+		// io.print()
+		HorseClass current = objects.get(objects.size() - 1);
+		int dotIndex = indexOfSpecial('.', code);
+		String formattedLine = "";
+
+		if (dotIndex == -1) {
+			// print()
+			// Or the function call must be made inside a function
+			// TODO: fix issues when dealing with objects in the main method (or not?) - it
+			// is a feature not a bug?
+			if (!isCFunction(code)) {
+				String functionName = code.substring(0, code.indexOf('(') + 1);
+				String restOfParameters = code.substring(code.indexOf('(') + 1);
+				formattedLine += executeFunction(functionName + "__" + current.getName() + "__obj," + restOfParameters);
+			} else {
+				formattedLine += code + ";";
+			}
+
+		} else {
+			// input.print()
+			String[] dotData = splitSpecial('.', code);
+			formattedLine += dotData[0] + "->";
+			for (int i = 1; i < dotData.length; i++) {
+				String function = dotData[i];
+				String functionName = function.substring(0, function.indexOf('(') + 1);
+				String restOfParameters = function.substring(function.indexOf('(') + 1);
+				formattedLine += executeFunction(functionName + "(" + dotData[0] + "," + restOfParameters);
+				if (i != dotData.length - 1)
+					formattedLine += "->";
+			}
+			formattedLine += ";";
+		}
+		return formattedLine;
+	}
+
+	private boolean isCFunction(String code) {
+		for (String str : c_functions)
+			if (code.startsWith(str))
+				return true;
+		return false;
+	}
+
+	// TODO: create a special case use of main() function
+	private String executeFunction(String code) {
 		// fprintf()
-		String formattedCode = code.replaceAll("\\.", "->");
-		int paranthesisIndex = indexOfSpecial('(', formattedCode);
+		int paranthesisIndex = indexOfSpecial('(', code);
+
 		String functionName = code.substring(0, paranthesisIndex);
-		String parameters = code.substring(paranthesisIndex + 1, indexOfSpecial(')', formattedCode));
+		String parameters = code.substring(paranthesisIndex + 1, indexOfSpecial(')', code));
 		String[] parameterList = splitSpecial(',', parameters);
 
-		String fullFunctionDetails = functionName + "(";
+		String fullFunctionDetails = functionName + "("
+				+ (parameterList.length > 1 ? parameterList[0].substring(1) + "," : parameterList[0].substring(1));
+
 		HorseClass current = objects.get(objects.size() - 1);
 		List<String> varList = current.getVariableIndexList();
-		for (int i = 0; i < parameterList.length; i++) {
+
+		for (int i = 1; i < parameterList.length; i++) {
 			String var = parameterList[i];
 			if (isVariable(var))
 				fullFunctionDetails += "__" + objects.get(objects.size() - 1).getName() + "__obj->" + var;
 			else
 				fullFunctionDetails += var;
-
 			if (i != parameterList.length - 1)
 				fullFunctionDetails += ",";
 		}
 		fullFunctionDetails += ");";
 
-		current.add(fullFunctionDetails);
+		return fullFunctionDetails;
 	}
 
 	private boolean isVariable(String variable) {
@@ -169,16 +213,19 @@ public class Compiler {
 		// so far char *name is guaranteed to be present
 		HorseClass current = objects.get(objects.size() - 1);
 
-		if (splitResult.length == 3) {
+		if (splitResult.length == 4) {
 			// char *name = malloc() or char *name = previousName
+			current.addVariable(splitResult[0] + " " + splitResult[1] + ";");
+			current.addVariableIndex(splitResult[1]);
+			String identifierWithoutPointer = splitResult[1].contains("*") ? splitResult[1].substring(1)
+					: splitResult[1];
 			if (indexOfSpecial('(', splitResult[1]) != -1) {
 				// substring(1) for accounting for the extra space in between
-				executeCFunction(splitResult[1].substring(1));
+				current.add(identifierWithoutPointer + " = " + dealWithFunctionCalls(splitResult[3]) + ";");
 			} else {
-				String identifierWithoutPointer = splitResult[1].contains("*") ? splitResult[1].substring(1)
-						: splitResult[1];
-				current.add(identifierWithoutPointer + " = " + splitResult[1] + ";");
+				current.add(identifierWithoutPointer + " = " + splitResult[3] + ";");
 			}
+			return;
 		} else if (splitResult.length == 5) {
 			// IO i = new IO()
 			current.add(splitResult[1] + "=" + splitResult[4].substring(0, splitResult[4].indexOf('(')) + "_constructor"
@@ -196,7 +243,6 @@ public class Compiler {
 	private void executeClassIdentifier(String code) {
 		// Example: class Name extends Object
 		String[] splitResult = code.split(" ");
-		System.out.println("SPLIT RESULT: " + Arrays.asList(splitResult));
 		if (splitResult.length >= 2) {
 			// class Name
 			HorseClass newObj = new HorseClass(splitResult[1], headers);
@@ -260,14 +306,24 @@ public class Compiler {
 		HorseClass current = objects.get(objects.size() - 1);
 		String functionName = functionHeader.substring(0, functionHeader.indexOf('('));
 		String className = current.getName() + "_";
+
+		String parameters = "(" + current.getName() + "_t* __" + current.getName() + "__obj";
+		int paranthesisIndex = indexOfSpecial('(', code);
+		if (code.charAt(paranthesisIndex + 1) != ')') {
+			parameters = "," + splitResult[0].substring(indexOfSpecial('(', splitResult[0]) + 1);
+		}
+		parameters += splitResult[0].substring(indexOfSpecial('(', splitResult[0]) + 1);
+
 		if (functionName.contentEquals("main")) {
 			className = "";
+			parameters = splitResult[0].substring(indexOfSpecial('(', splitResult[0]));
 		}
-		current.addVariable(
-				returnType + "(*" + functionName + ") " + functionHeader.substring(functionHeader.indexOf('(')) + ";");
+
+		current.addVariable(returnType + "(*" + functionName + ") " + parameters + ";");
 		current.addConstructorLine(
 				"__" + current.getName() + "__obj->" + functionName + "=&" + className + functionName + ";");
-		current.add(returnType + " " + className + functionHeader + "{");
+		current.add(returnType + " " + className + functionHeader.substring(0, indexOfSpecial('(', functionHeader))
+				+ parameters + "{");
 
 		// Change the current parentheses scope status to 1
 		scopeStatus++;

@@ -39,7 +39,7 @@ public class HorseClass {
 	public void addConstructorLine(String line) {
 		constructorLines.add(line);
 	}
-	
+
 	public void addConstructorLineAt(int index, String line) {
 		constructorLines.add(index, line);
 	}
@@ -59,17 +59,13 @@ public class HorseClass {
 	}
 
 	public String getPackage() {
-		// For now, getConstructor() is at the last line so we don't have to write prototypes
-		// TODO: fix this method
-		 return header + "\n" + getAllAttributes() + "\n" + getRestOfTheLines() + "\n" + getConstructor();
-		// return header + "\n" + getAllAttributes() + "\n" + getConstructor() + "\n" + getRestOfTheLines() + "\n";
+		return header + "\n" + getAllAttributes() + "\n" + getRestOfTheLines() + "\n" + getConstructor();
 	}
 
 	private String getAllAttributes() {
 		String fullTypedef = "typedef struct {\n";
 		for (String var : compiledVariables) {
 			fullTypedef += var + "\n";
-			System.out.println("var: " + var + "\n");
 		}
 		fullTypedef += "\n} " + name + "_t;\n";
 		return fullTypedef;
@@ -87,10 +83,7 @@ public class HorseClass {
 		String fullSource = "";
 		for (String line : compiledLines) {
 			fullSource += line + "\n";
-			System.out.println("getRestOfTheLines(): " + line);
 		}
-			
-
 		return fullSource;
 	}
 
@@ -121,5 +114,5 @@ public class HorseClass {
 	public List<String> getVariableIndexList() {
 		return variableIndexList;
 	}
-	
+
 }
