@@ -14,5 +14,5 @@ void String_append(String_t* __String__obj,char* extra) {
 
 }
 char String_charAt(String_t* __String__obj,long index) {
-return text[index];
+return  text;
 }

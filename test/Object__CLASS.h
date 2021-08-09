@@ -1,4 +1,4 @@
-#ifdef Object____CLASS_H_
+#ifndef Object____CLASS_H_
 #define Object____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-#ifdef Compiler____CLASS_H_
+#ifndef Compiler____CLASS_H_
 #define Compiler____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>

@@ -48,7 +48,7 @@ class String extends Object
 	end
 
 	function charAt(long index) returns char
-		return text[index]
+		return text[i]
 	end
 
 end

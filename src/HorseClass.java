@@ -24,7 +24,7 @@ import java.util.List;
 
 public class HorseClass {
 
-	public static final String IFDEF = "#ifdef", ENDIF = "#endif", DEFINE = "#define";
+	public static final String IFNDEF = "#ifndef", ENDIF = "#endif", DEFINE = "#define";
 	public static final String INCLUDE = "#include";
 	public static final String CLASS = "__CLASS";
 
@@ -98,7 +98,7 @@ public class HorseClass {
 
 	public String getHeaderFilePackage() {
 		// Pre-Definitions to make life easier :)
-		String ifdef = IFDEF + " " + name + "__" + CLASS + "_H_";
+		String ifdef = IFNDEF + " " + name + "__" + CLASS + "_H_";
 		String define = DEFINE + " " + name + "__" + CLASS + "_H_";
 		String endIf = ENDIF + "\n";
 

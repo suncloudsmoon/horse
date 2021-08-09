@@ -1,4 +1,4 @@
-#ifdef String____CLASS_H_
+#ifndef String____CLASS_H_
 #define String____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>

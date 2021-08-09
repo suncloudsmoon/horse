@@ -1,4 +1,4 @@
-#ifdef IO____CLASS_H_
+#ifndef IO____CLASS_H_
 #define IO____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>
