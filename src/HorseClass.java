@@ -1,12 +1,18 @@
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
 public class HorseClass {
 
+	public static final String IFDEF = "#ifdef", ENDIF = "#endif", DEFINE = "#define";
+	public static final String INCLUDE = "#include";
+	public static final String CLASS = "__CLASS";
+
 	private String name;
 
 	// Headers, etc.
-	private String header;
+	private String headers;
 
 	private List<String> variableIndexList;
 	private List<String> compiledVariables;
@@ -15,9 +21,11 @@ public class HorseClass {
 	private List<String> constructorLines;
 	private String endOfConstructor;
 
-	public HorseClass(String name, String header) {
+	private List<String> functionPrototypes;
+
+	public HorseClass(String name, String headers) {
 		this.name = name;
-		this.header = header;
+		this.headers = headers;
 
 		// Initializing new objects...
 		compiledVariables = new LinkedList<>();
@@ -25,6 +33,8 @@ public class HorseClass {
 
 		compiledLines = new LinkedList<>();
 		constructorLines = new LinkedList<>();
+
+		functionPrototypes = new LinkedList<>();
 	}
 
 	public void add(String compiledLine) {
@@ -44,6 +54,10 @@ public class HorseClass {
 		constructorLines.add(index, line);
 	}
 
+	public void addFunctionPrototype(String line) {
+		functionPrototypes.add(line);
+	}
+
 	/**
 	 * Can also add function names (like C where you can treat functions like
 	 * pointers)
@@ -58,8 +72,26 @@ public class HorseClass {
 		variableIndexList.add(varName);
 	}
 
-	public String getPackage() {
-		return header + "\n" + getAllAttributes() + "\n" + getRestOfTheLines() + "\n" + getConstructor();
+	public String getSourceFilePackage() {
+		String includeFile = INCLUDE + " \"" + name + CLASS + ".h\"";
+		return includeFile + "\n" + getConstructor() + "\n" + getRestOfTheLines();
+	}
+
+	public String getHeaderFilePackage() {
+		// Pre-Definitions to make life easier :)
+		String ifdef = IFDEF + " " + name + "_H_";
+		String define = DEFINE + " " + name + "_H_";
+		String endIf = ENDIF + "\n";
+
+		String startHeader = ifdef + "\n" + define;
+		String endHeader = endIf;
+
+		// We set headers to null frequently, so the if check is necessary
+		if (headers == null)
+			headers = "";
+
+		return startHeader + "\n" + headers + "\n" + getAllAttributes() + "\n" + getAllFunctionPrototypes() + "\n"
+				+ endHeader;
 	}
 
 	private String getAllAttributes() {
@@ -68,8 +100,16 @@ public class HorseClass {
 		for (String var : compiledVariables) {
 			fullTypedef += var + "\n";
 		}
-		fullTypedef += "\n}";
+		fullTypedef += "\n};";
 		return fullTypedef;
+	}
+
+	private String getAllFunctionPrototypes() {
+		String allPrototypes = "";
+		for (String funct : functionPrototypes) {
+			allPrototypes += funct + "\n";
+		}
+		return allPrototypes;
 	}
 
 	private String getConstructor() {
@@ -86,6 +126,16 @@ public class HorseClass {
 			fullSource += line + "\n";
 		}
 		return fullSource;
+	}
+
+	public void writeToFile(String initialDirectory) throws IOException {
+		try (FileWriter w = new FileWriter(initialDirectory + name + CLASS + ".c")) {
+			w.append(getSourceFilePackage());
+		}
+
+		try (FileWriter w = new FileWriter(initialDirectory + name + CLASS + ".h")) {
+			w.append(getHeaderFilePackage());
+		}
 	}
 
 	/**

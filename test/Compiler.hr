@@ -13,7 +13,6 @@ end
 
 import basics
 import Object
-
 class String extends Object
 	char* text
 	long length

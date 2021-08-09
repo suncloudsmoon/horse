@@ -1,12 +1,9 @@
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.security.auth.login.LoginContext;
 
 public class Compiler {
 
@@ -93,7 +90,7 @@ public class Compiler {
 							break;
 						}
 					}
-					// For processing existing variables: text = malloc() 
+					// For processing existing variables: text = malloc()
 					HorseClass current = objects.get(objects.size() - 1);
 					for (String var : objects.get(objects.size() - 1).getVariableIndexList()) {
 						if (cleanOne.startsWith(var)) {
@@ -104,7 +101,7 @@ public class Compiler {
 							if (indexOfSpecial('(', cleanOne) != -1) {
 								compiledLine += "=" + dealWithFunctionCalls(splitResult[2]);
 							} else {
-								compiledLine += ";";
+								compiledLine += splitResult[1].concat(" ").concat(splitResult[2]) + ";";
 							}
 							if (inConstructor) {
 								current.addConstructorLine(compiledLine);
@@ -126,9 +123,7 @@ public class Compiler {
 
 		// Export the compiled C code in String to File
 		for (HorseClass cls : objects) {
-			try (FileWriter w = new FileWriter(Main.testOrNot + cls.getName() + ".c")) {
-				w.append(cls.getPackage());
-			}
+			cls.writeToFile(Main.testOrNot);
 		}
 	}
 
@@ -341,8 +336,11 @@ public class Compiler {
 		current.addVariable(returnType + "(*" + functionName + ") " + parameters + ";");
 		current.addConstructorLine(
 				"__" + current.getName() + "__obj->" + functionName + "=&" + className + functionName + ";");
-		current.add(returnType + " " + className + functionHeader.substring(0, indexOfSpecial('(', functionHeader))
-				+ parameters + "{");
+
+		String completeHeader = returnType + " " + className
+				+ functionHeader.substring(0, indexOfSpecial('(', functionHeader)) + parameters;
+		current.addFunctionPrototype(completeHeader + ";");
+		current.add(completeHeader + "{");
 
 		// Change the current parentheses scope status to 1
 		scopeStatus++;
@@ -374,8 +372,18 @@ public class Compiler {
 			headers += IMPORT_BASICS;
 		} else {
 			// TODO: change .c to .h and move stuff to header files soon
-			headers += "#include \"" + thingToImport + ".c\"\n";
+			String header = HorseClass.INCLUDE + " \"" + thingToImport
+					+ (isExistingClass(thingToImport) ? "__CLASS" : "") + ".h\"\n";
+			;
+			headers += header;
 		}
+	}
+
+	private boolean isExistingClass(String name) {
+		for (HorseClass cls : objects)
+			if (name.contentEquals(cls.getName()))
+				return true;
+		return false;
 	}
 
 	private void executeReturnIdentifier(String code) {
