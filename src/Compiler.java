@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.security.auth.login.LoginContext;
+
 public class Compiler {
 
 	private String sourceFile;
@@ -20,7 +22,7 @@ public class Compiler {
 
 	// C Identifiers
 	// GOAL: Inherits the C stuff and makes it safer from there
-	private String[] c_identifers = { "void", "char*", "FILE", "long" };
+	private String[] c_identifers = { "void", "char", "long", "FILE" };
 	private String[] c_functions = { "fopen", "fprintf", "malloc", "strcat" };
 
 	// Import stuff
@@ -39,7 +41,7 @@ public class Compiler {
 		objects = new ArrayList<>();
 	}
 
-	// c_printf()
+	// "All roads lead to Rome"... is here
 	public void start(String destFile) throws FileNotFoundException, IOException {
 		try (BufferedReader r = new BufferedReader(new FileReader(sourceFile))) {
 			String line;
@@ -76,16 +78,39 @@ public class Compiler {
 				} else {
 					boolean isSomething = false;
 					for (String cIdent : c_identifers) {
-						if (cleanOne.startsWith(cIdent) && indexOfSpecial('=', cleanOne) != -1) {
+						if (cleanOne.startsWith(cIdent)) {
 							executeIdentifer(cleanOne);
 							isSomething = true;
 							break;
 						}
 					}
+					// For identifying instructions that create objects: IO i = new IO()
 					for (int i = 0; i < objects.size(); i++) {
 						HorseClass current = objects.get(i);
 						if (cleanOne.startsWith(current.getName())) {
 							executeIdentifer(cleanOne);
+							isSomething = true;
+							break;
+						}
+					}
+					// For processing existing variables: text = malloc() 
+					HorseClass current = objects.get(objects.size() - 1);
+					for (String var : objects.get(objects.size() - 1).getVariableIndexList()) {
+						if (cleanOne.startsWith(var)) {
+							// text = malloc()
+							String[] splitResult = splitSpecial(' ', cleanOne);
+							String compiledLine = "__" + current.getName() + "__obj->" + splitResult[0];
+							// If cleanOne has a function here: text = malloc()
+							if (indexOfSpecial('(', cleanOne) != -1) {
+								compiledLine += "=" + dealWithFunctionCalls(splitResult[2]);
+							} else {
+								compiledLine += ";";
+							}
+							if (inConstructor) {
+								current.addConstructorLine(compiledLine);
+							} else {
+								current.add(compiledLine);
+							}
 							isSomething = true;
 							break;
 						}
@@ -107,13 +132,17 @@ public class Compiler {
 		}
 	}
 
-	private void generalBehavior(String cleanOne) {
+	private void generalBehavior(String code) {
 		HorseClass current = objects.get(objects.size() - 1);
 		String addStr = "";
 
-		System.out.println("General Behavor: " + cleanOne);
-
-		addStr = (indexOfSpecial('(', cleanOne) != -1) ? dealWithFunctionCalls(cleanOne) : cleanOne + ";";
+		if (indexOfSpecial('(', code) != -1) {
+			dealWithFunctionCalls(code);
+		} else if (isCIdentifier(code)) {
+			executeIdentifer(code);
+		} else {
+			addStr = code + ";";
+		}
 		if (inConstructor)
 			current.addConstructorLine(addStr);
 		else
@@ -135,6 +164,7 @@ public class Compiler {
 			// TODO: fix issues when dealing with objects in the main method (or not?) - it
 			// is a feature not a bug?
 			if (!isCFunction(code)) {
+				System.out.println("Code: " + code);
 				String functionName = code.substring(0, code.indexOf('(') + 1);
 				String restOfParameters = code.substring(code.indexOf('(') + 1);
 				formattedLine += executeFunction(functionName + "__" + current.getName() + "__obj," + restOfParameters);
@@ -169,10 +199,10 @@ public class Compiler {
 	// TODO: create a special case use of main() function
 	private String executeFunction(String code) {
 		// fprintf()
-		int paranthesisIndex = indexOfSpecial('(', code);
+		int paranthesisIndex = code.indexOf('(');
 
 		String functionName = code.substring(0, paranthesisIndex);
-		String parameters = code.substring(paranthesisIndex + 1, indexOfSpecial(')', code));
+		String parameters = code.substring(paranthesisIndex + 1, code.lastIndexOf(')'));
 		String[] parameterList = splitSpecial(',', parameters);
 
 		String fullFunctionDetails = functionName + "("
@@ -211,17 +241,18 @@ public class Compiler {
 		// so far char *name is guaranteed to be present
 		HorseClass current = objects.get(objects.size() - 1);
 
+		String pointerOrNot = " ";
+		String objectAccess = "__" + current.getName() + "__obj->";
 		if (splitResult.length == 4) {
 			// char *name = malloc() or char *name = previousName
-			current.addVariable(splitResult[0] + " " + splitResult[1] + ";");
-			current.addVariableIndex(splitResult[1]);
 			String identifierWithoutPointer = splitResult[1].contains("*") ? splitResult[1].substring(1)
 					: splitResult[1];
-			if (indexOfSpecial('(', splitResult[1]) != -1) {
-				// substring(1) for accounting for the extra space in between
-				current.add(identifierWithoutPointer + " = " + dealWithFunctionCalls(splitResult[3]) + ";");
+
+			String varDeclaration = objectAccess + identifierWithoutPointer + " = ";
+			if (indexOfSpecial('(', splitResult[3]) != -1) {
+				current.add(varDeclaration + dealWithFunctionCalls(splitResult[3]) + ";");
 			} else {
-				current.add(identifierWithoutPointer + " = " + splitResult[3] + ";");
+				current.add(varDeclaration + splitResult[3] + ";");
 			}
 			return;
 		} else if (splitResult.length == 5) {
@@ -229,37 +260,29 @@ public class Compiler {
 			current.add(splitResult[1] + "=" + splitResult[4].substring(0, splitResult[4].indexOf('(')) + "_constructor"
 					+ splitResult[4].substring(splitResult[4].indexOf('(')) + ";");
 			// Custom variable addition
-			current.addVariable(splitResult[0] + "*" + splitResult[1] + ";");
-			current.addVariableIndex(splitResult[1]);
+			pointerOrNot = "*";
 			return;
 		}
-		current.addVariable(splitResult[0] + " " + splitResult[1] + ";");
+		current.addVariable(splitResult[0] + pointerOrNot + splitResult[1] + ";");
 		current.addVariableIndex(splitResult[1]);
 	}
 
 	// Class/Object Functions
 	private void executeClassIdentifier(String code) {
-		// Example: class Name extends Object
+		// Example: class Name
 		String[] splitResult = code.split(" ");
-		if (splitResult.length >= 2) {
-			// class Name
-			HorseClass newObj = new HorseClass(splitResult[1], headers);
-			objects.add(newObj);
-			newObj.addConstructorLine("");
+		HorseClass newObj = new HorseClass(splitResult[1], headers);
+		objects.add(newObj);
+		if (splitResult.length == 4) {
+			// class Name extends Object
+			newObj.addVariable(splitResult[3] + "_t *__extends;");
+			newObj.addVariableIndex(splitResult[1]);
 
-			if (splitResult.length == 4) {
-				// class Name extends Object
-
-				newObj.addVariable(splitResult[3] + "_t *__extends;");
-				newObj.addVariableIndex(splitResult[1]);
-
-				// Add __extends to the constructor
-
-				newObj.addConstructorLine(
-						"__" + newObj.getName() + "__obj->__extends = " + splitResult[3] + "_constructor();");
-			}
+			// Add __extends to the constructor
+			newObj.addConstructorLine(
+					"__" + newObj.getName() + "__obj->__extends = " + splitResult[3] + "_constructor();");
 		}
-		resetClass();
+		resetClass(); // reset variables used by the previous class
 	}
 
 	private void resetClass() {
@@ -306,8 +329,7 @@ public class Compiler {
 		String className = current.getName() + "_";
 
 		String parameters = "(" + current.getName() + "_t* __" + current.getName() + "__obj";
-		int paranthesisIndex = indexOfSpecial('(', code);
-		if (splitSpecial(',', code.substring(code.indexOf('(') + 1, code.indexOf(')'))).length >= 1) {
+		if (splitSpecial(',', code.substring(code.indexOf('(') + 1, code.lastIndexOf(')'))).length >= 1) {
 			parameters += ",";
 		}
 		parameters += splitResult[0].substring(splitResult[0].indexOf('(') + 1);
@@ -393,7 +415,7 @@ public class Compiler {
 
 		for (int i = 0; i < str.length(); i++) {
 			char letter = str.charAt(i);
-			if (letter == '"' || letter == '\'') {
+			if (letter == '"' || letter == '\'' || letter == '(' || letter == ')') {
 				isQuote = !isQuote;
 			} else if (!isQuote && letter == find && previousChar != find) {
 				list.add(str.substring(previousIndex, i));

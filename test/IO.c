@@ -3,19 +3,18 @@
 #include <stdbool.h>
 #include "String.c"
 
-typedef struct {
+typedef struct IO_t IO_t;
+struct IO_t{
 Object_t *__extends;
 long(*print) (IO_t* __IO__obj,char* text) ;
 
-} IO_t;
-
+}
 long IO_print(IO_t* __IO__obj,char* text) {
-fprintf(stdout, "%s\n", text);
+
 }
 
 IO_t* IO_constructor(){
 IO_t* __IO__obj = malloc(sizeof(IO_t));
-
 __IO__obj->__extends = Object_constructor();
 __IO__obj->print=&IO_print;
 return __IO__obj;

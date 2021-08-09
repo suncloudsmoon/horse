@@ -63,11 +63,12 @@ public class HorseClass {
 	}
 
 	private String getAllAttributes() {
-		String fullTypedef = "typedef struct {\n";
+		String fullTypedef = "typedef struct " + name + "_t " + name + "_t;\n";
+		fullTypedef += "struct " + name + "_t{\n";
 		for (String var : compiledVariables) {
 			fullTypedef += var + "\n";
 		}
-		fullTypedef += "\n} " + name + "_t;\n";
+		fullTypedef += "\n}";
 		return fullTypedef;
 	}
 
