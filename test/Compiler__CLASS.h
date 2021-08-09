@@ -1,5 +1,5 @@
-#ifdef Compiler_H_
-#define Compiler_H_
+#ifdef Compiler____CLASS_H_
+#define Compiler____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>

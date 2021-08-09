@@ -1,5 +1,5 @@
-#ifdef IO_H_
-#define IO_H_
+#ifdef IO____CLASS_H_
+#define IO____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>

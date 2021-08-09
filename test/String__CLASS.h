@@ -1,5 +1,5 @@
-#ifdef String_H_
-#define String_H_
+#ifdef String____CLASS_H_
+#define String____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>

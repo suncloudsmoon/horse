@@ -1,5 +1,5 @@
-#ifdef Object_H_
-#define Object_H_
+#ifdef Object____CLASS_H_
+#define Object____CLASS_H_
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
