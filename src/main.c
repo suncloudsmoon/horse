@@ -33,8 +33,8 @@
 #include <string.h>
 
 #define AVG_STRING_SIZE 2048
-#define STRING_ALLOCATION_SIZE 5000
-#define LIST_MANAGER_ALLOC_SIZE 10000
+#define STRING_ALLOCATION_SIZE 5
+#define LIST_MANAGER_ALLOC_SIZE 10
 
 typedef enum {
 	ERRNO_EXCEPTION = 1,
@@ -124,8 +124,9 @@ int writeToFile(compiler_t *com);
 const char *functionIdentifier = "function";
 
 int main() {
-	char *inputFilename = "test/compl.hr";
-	char *outputFilename = "test/compl.ctxt";
+	printf("YASSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS");
+	char *inputFilename = "src/compl.hr";
+	char *outputFilename = "src/main.c";
 	FILE *input = fopen(inputFilename, "r");
 	FILE *output = fopen(outputFilename, "w");
 
@@ -135,7 +136,7 @@ int main() {
 	return 0;
 }
 
-compiler_t* compiler_init(FILE *inputFile, FILE *outputFile) {
+ compiler_t*  compiler_init(FILE *inputFile, FILE *outputFile) {
 	compiler_t *com = malloc(sizeof(compiler_t));
 	com->allLines = list_init();
 	com->parsedLines = list_init();
@@ -169,8 +170,7 @@ void readAllLines(compiler_t *com) {
 		list_add(string_copyvalueof_s(line), com->allLines);
 		// Debug
 		printf("[readAllLines] line from stream: %s\n", line->text);
-		// string_reset(line);
-		string_free(line);
+		free(line);
 		line = string_init();
 	}
 	string_free(line);
@@ -238,7 +238,7 @@ void compile(compiler_t *com) {
 }
 
 static string_t* compileFunctionHeader(list_t *tokens) {
-	// function something() returns int
+	// unction something() returns int
 	char functHeader[1000];
 	snprintf(functHeader, 1000, "%s %s {", ((string_t*) tokens->data[3])->text,
 			((string_t*) tokens->data[1])->text);
@@ -565,14 +565,11 @@ void string_free(void *dest) {
 static void string_meminspection(int addNum, string_t *subject) {
 	if (subject->text_length + addNum + 1 >= subject->text_allocated_length) {
 		addNum += subject->text_length / 2;
-		char *tempStr = (char *) malloc(subject->text_allocated_length + addNum * sizeof(char));
-		// char *tempStr = (char *) realloc(subject->text, addNum * sizeof(char));
-
+		char *tempStr = (char *) realloc(subject->text, addNum * sizeof(char));
 		// Safety
 		if (tempStr == NULL)
 			throw_exception(NULL_POINTER_EXCEPTION, -1,
 					"Unable to allocate memory for string while doing meminspection!\n");
-		strncpy(tempStr, subject->text, subject->text_allocated_length + addNum);
 		subject->text = tempStr;
 		subject->text_allocated_length += addNum;
 	}

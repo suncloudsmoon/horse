@@ -124,8 +124,9 @@ int writeToFile(compiler_t *com);
 const char *functionIdentifier = "function";
 
 int main() {
-	char *inputFilename = "test/compl.hr";
-	char *outputFilename = "test/compl.ctxt";
+	printf("YASSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS");
+	char *inputFilename = "src/compl.hr";
+	char *outputFilename = "src/main.c";
 	FILE *input = fopen(inputFilename, "r");
 	FILE *output = fopen(outputFilename, "w");
 
