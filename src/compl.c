@@ -123,7 +123,7 @@ const char *functionIdentifier = "function";
 
  int  main() {
 	char *inputFilename = "src/compl.hr";
-	char *outputFilename = "src/compl.ctxt";
+	char *outputFilename = "src/compl.c";
 	FILE *input = fopen(inputFilename, "r");
 	FILE *output = fopen(outputFilename, "w");
 
@@ -244,8 +244,9 @@ int writeToFile(compiler_t *com) {
 	FILE *output = com->outputFile;
 	for (int i = 0; i < com->compiledLines->data_length; i++) {
 		fprintf(output, "%s\n",
-				((string_t*) com->compiledLines->data[i])->text);
+				((string_t*) com->compiledLines->data[i])->text);		
 	}
+	printf("Successfully wrote to File!");
 	return fclose(output);
 }
 
