@@ -1,2 +1,6 @@
-/bin/
-/Debug/
+.settings/
+Debug/
+Release/
+doc/
+.cproject
+.project

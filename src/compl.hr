@@ -32,7 +32,7 @@
 #include <ctype.h>
 #include <string.h>
 
-#define AVG_STRING_SIZE 2048
+#define AVG_STRING_SIZE 5
 #define STRING_ALLOCATION_SIZE 5
 #define LIST_MANAGER_ALLOC_SIZE 10
 
@@ -44,24 +44,22 @@ typedef enum {
 
 typedef struct {
 	char *text;
-
-	int text_length;
-	int text_allocated_length;
+	size_t text_length;
+	size_t text_allocated_length;
 } string_t;
 
 typedef struct {
 	void **data;
-
-	int data_length;
-	int data_allocated_length;
+	size_t data_length;
+	size_t data_allocated_length;
 } list_t;
 
 // Exception Stuff
 void throw_exception(exception e, int lineNum, char *message, ...);
 
 // String stuff
-static string_t* custom_string_init(int allocationSize);
-static void string_meminspection(int addNum, string_t *subject);
+static string_t* custom_string_init(size_t allocationSize);
+static void string_meminspection(size_t addNum, string_t *subject);
 string_t* string_init();
 string_t* string_copyvalueof(char *text);
 string_t* string_copyvalueof_s(string_t *src);
@@ -83,8 +81,8 @@ void string_reset(string_t *dest);
 void string_free(void *dest);
 
 // List Stuff
-static list_t* custom_list_init(int mallocSize);
-static void list_meminspector(int addNum, list_t *subject);
+static list_t* custom_list_init(size_t mallocSize);
+static void list_meminspector(size_t addNum, list_t *subject);
 list_t* list_init();
 void list_add(void *item, list_t *list);
 void list_remove(int index, list_t *list);
@@ -123,10 +121,9 @@ int writeToFile(compiler_t *com);
 
 const char *functionIdentifier = "function";
 
-int main() {
-	printf("YASSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS");
+function main() returns int
 	char *inputFilename = "src/compl.hr";
-	char *outputFilename = "src/main.c";
+	char *outputFilename = "src/compl.ctxt";
 	FILE *input = fopen(inputFilename, "r");
 	FILE *output = fopen(outputFilename, "w");
 
@@ -170,8 +167,7 @@ void readAllLines(compiler_t *com) {
 		list_add(string_copyvalueof_s(line), com->allLines);
 		// Debug
 		printf("[readAllLines] line from stream: %s\n", line->text);
-		free(line);
-		line = string_init();
+		string_reset(line);
 	}
 	string_free(line);
 }
@@ -194,7 +190,6 @@ void parse(compiler_t *com) {
 
 		// Debug
 		printf("[parse] initialClean: %s\n", initialClean->text);
-		printf("[parse] split: %s\n", split(' ', initialClean)[0]);
 	}
 }
 
@@ -264,7 +259,7 @@ list_t* list_init() {
 	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
 }
 
-static list_t* custom_list_init(int mallocSize) {
+static list_t* custom_list_init(size_t mallocSize) {
 	list_t *list = malloc(sizeof(list_t));
 	list->data = (void**) malloc(mallocSize * sizeof(void*));
 
@@ -341,18 +336,18 @@ void list_complete_free(void (*indivfree)(void*), list_t *list) {
 	list_free(list);
 }
 
-static void list_meminspector(int addNum, list_t *subject) {
+static void list_meminspector(size_t addNum, list_t *subject) {
 	if (subject->data_length + addNum >= subject->data_allocated_length) {
-		addNum += subject->data_length / 2;
+		size_t newSize = 1.5 * subject->data_allocated_length + addNum;
 		void **new_ptr = (void**) realloc(subject->data,
-				addNum * sizeof(void*));
+				newSize * sizeof(void*));
 		if (new_ptr == NULL)
 			throw_exception(NULL_POINTER_EXCEPTION, -1,
 					"Unable to allocate memory for list with length %d!",
 					subject->data_length);
 
 		subject->data = new_ptr;
-		subject->data_allocated_length += addNum;
+		subject->data_allocated_length = newSize;
 	}
 }
 
@@ -368,10 +363,10 @@ string_t* string_init() {
 	return str;
 }
 
-static string_t* custom_string_init(int allocationSize) {
+static string_t* custom_string_init(size_t allocationSize) {
 	string_t *str = malloc(sizeof(string_t));
 
-	str->text = malloc(allocationSize * sizeof(char));
+	str->text = malloc(allocationSize);
 	str->text[0] = '\0';
 
 	str->text_length = 0;
@@ -391,10 +386,10 @@ string_t* string_copyvalueof(char *src) {
 }
 
 string_t* string_copyvalueof_s(string_t *src) {
-	// QUESTION: does memcpy() even work?
-	string_t *dest = custom_string_init(src->text_allocated_length);
-	strncpy(dest->text, src->text, src->text_allocated_length);
+	string_t *dest = malloc(sizeof(string_t));
+	dest->text = strdup(src->text);
 	dest->text_length = src->text_length;
+	dest->text_allocated_length = src->text_length + 1;
 
 	return dest;
 }
@@ -510,7 +505,7 @@ bool string_startswith(string_t *src, char *search) {
 //}
 
 string_t* string_substring_s(int startIndex, int endIndex, string_t *src) {
-	int totalAppend = endIndex - startIndex;
+	size_t totalAppend = endIndex - startIndex;
 // Safety
 	if (totalAppend < 0 || totalAppend > src->text_length) {
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
@@ -518,7 +513,7 @@ string_t* string_substring_s(int startIndex, int endIndex, string_t *src) {
 				startIndex, endIndex);
 	}
 // TODO: fix this
-	string_t *newStr = string_init();
+	string_t *newStr = custom_string_init(totalAppend + 1);
 	strncpy(newStr->text, src->text + startIndex, totalAppend);
 	newStr->text[totalAppend] = '\0';
 	newStr->text_length += totalAppend;
@@ -562,16 +557,17 @@ void string_free(void *dest) {
 }
 
 // Memory related functions
-static void string_meminspection(int addNum, string_t *subject) {
+static void string_meminspection(size_t addNum, string_t *subject) {
+	// +1 for accounting the null terminator
 	if (subject->text_length + addNum + 1 >= subject->text_allocated_length) {
-		addNum += subject->text_length / 2;
-		char *tempStr = (char *) realloc(subject->text, addNum * sizeof(char));
+		size_t newSize = 1.5 * subject->text_allocated_length + addNum + 1;
+		char *tempStr = (char *) realloc(subject->text, newSize);
 		// Safety
 		if (tempStr == NULL)
 			throw_exception(NULL_POINTER_EXCEPTION, -1,
 					"Unable to allocate memory for string while doing meminspection!\n");
 		subject->text = tempStr;
-		subject->text_allocated_length += addNum;
+		subject->text_allocated_length = newSize;
 	}
 }
 
@@ -582,7 +578,7 @@ void throw_exception(exception e, int lineNum, char *message, ...) {
 	va_start(args, message);
 	char cMessage[AVG_STRING_SIZE];
 	if (lineNum == -1) {
-		strcpy(cMessage, "Internal Error [");
+		strncpy(cMessage, "Internal Error [", AVG_STRING_SIZE);
 		vsnprintf(cMessage, AVG_STRING_SIZE, message, args);
 		strcat(cMessage, "]");
 	} else {
