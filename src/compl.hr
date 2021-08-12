@@ -125,6 +125,7 @@ int writeToFile(compiler_t *com);
 
 // Identifiers
 const char *functionIdentifier = "function";
+const char *privateFunctionIdentifier = "private function";
 const char *endIdentifier = "end";
 
 const char *thenKeyword = "then";
@@ -134,6 +135,7 @@ const char *elseIdentifier = "or";
 const char *forIdentifier = "for";
 const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
+const char *takeIdentifier = "take"; // like switch()
 
 function main() returns int
 	char *inputFilename = "src/compl.hr";
@@ -187,13 +189,13 @@ function readAllLines(compiler_t *com) returns void
 	string_free(line);
 end
 
-static bool readLine(FILE *stream, string_t *line) {
+private function readLine(FILE *stream, string_t *line) returns bool
 	char letter;
 	while (letter = fgetc(stream)) != EOF && letter != '\n' do
 		string_appendchar(line, letter);
 	end	
 	return letter == EOF;
-}
+end
 
 function parse(compiler_t *com) returns void
 	for i to com->allLines->data_length do i++
@@ -204,13 +206,10 @@ function parse(compiler_t *com) returns void
 				existingLine->text_length, existingLine);
 		list_add(initialClean, com->cleanedLines);		
 		list_add(split(' ', initialClean), com->parsedLines);
-
-		// Debug
-		// printf("[parse] initialClean: %s\n", initialClean->text);
 	end
 end
 
-static list_t* split(char delimiter, string_t *line) {
+private function split(char delimiter, string_t *line) returns list_t*
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
@@ -226,11 +225,11 @@ static list_t* split(char delimiter, string_t *line) {
 	end
 	list_add(temp, output);
 	return output;
-}
+end
 
-static bool isSpecialCharacter(char alpha) {
+private function isSpecialCharacter(char alpha) returns bool
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
-}
+end
 
 function compile(compiler_t *com) returns void
 	string_t *parsed;
@@ -246,6 +245,13 @@ function compile(compiler_t *com) returns void
 			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
 			string_printf(parsed, " %s %s {", returnType->text, function->text);
 			com->scope++;
+
+		or if string_startswith(line, privateFunctionIdentifier) then
+			// private function blah() returns void
+			parsed = string_init();
+			string_t *function = string_substring_s(strlen(privateFunctionIdentifier), string_indexof_s(line, "returns"), line);
+			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
+			string_printf(parsed, "static %s %s {", returnType->text, function->text);
 
 		or if string_startswith(line, endIdentifier) then
 			parsed = string_copyvalueof("}");
@@ -311,13 +317,13 @@ function list_init() returns list_t*
 	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
 end
 
-static list_t* custom_list_init(size_t mallocSize) {
+private function custom_list_init(size_t mallocSize) returns list_t*
 	list_t *list = malloc(sizeof(list_t));
 	list->data = (void**) malloc(mallocSize * sizeof(void*));
 
 	list->data_length = 0;
 	list->data_allocated_length = mallocSize;
-}
+end
 
 function list_add(void *item, list_t *list) returns void
 	list_meminspector(1, list);
@@ -333,17 +339,16 @@ function list_remove(int index, list_t *list) returns void
 	list->data_length--;
 end
 
-void list_complete_remove(void (*indivfree)(void*), int index, list_t *list) {
+function list_complete_remove(void (*indivfree)(void*), int index, list_t *list) returns void
 	(*indivfree)(list->data[index]); // frees it from the respective free method for the unknown type data
 	list_remove(index, list);
-}
+end
 
 function list_clear(list_t *list) returns void
 	list->data_length = 0;
 end
 
-bool list_equals(void *destComp, int index,
-bool (*equalsComparator)(void*, void*), list_t *list) {
+function list_equals(void *destComp, int index, bool (*equalsComparator)(void*, void*), list_t *list) returns bool
 	if index < 0 || index >= list->data_length then
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Tried to access a list in index %d that was out of bounds!",
@@ -351,25 +356,25 @@ bool (*equalsComparator)(void*, void*), list_t *list) {
 	end			
 
 	return (*equalsComparator)(destComp, list->data[index]);
-}
+end
 
-bool list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) {
+function list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) returns bool
 	for i to list->data_length do i++
 		if (*equalsComparator)(destComp, list->data[i]) then
 			return true;
 		end	
 	end
 	return false;
-}
+end
 
-void list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) {
+function list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) returns void
 	fwrite(list->data_length, sizeof(int), 1, stream);
 	for i to list->data_length do i++
 		(*indiv)(list->data[i], stream);
 	end	
-}
+end
 
-list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
+function list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) returns list_t*
 	int arrayLength;
 	fread(&arrayLength, sizeof(int), 1, stream);
 
@@ -378,7 +383,7 @@ list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
 		list_add((*indivreverse)(stream), list);
 	end
 	return list;
-}
+end
 
 function list_free(list_t *list) returns void
 	free(list->data);
@@ -392,7 +397,7 @@ function list_complete_free(void (*indivfree)(void*), list_t *list) returns void
 	list_free(list);
 end
 
-static void list_meminspector(size_t addNum, list_t *subject) {
+private function list_meminspector(size_t addNum, list_t *subject) returns void
 	if subject->data_length + addNum >= subject->data_allocated_length then
 		size_t newSize = 1.5 * subject->data_allocated_length + addNum;
 		void **new_ptr = (void**) realloc(subject->data,
@@ -406,7 +411,7 @@ static void list_meminspector(size_t addNum, list_t *subject) {
 		subject->data = new_ptr;
 		subject->data_allocated_length = newSize;
 	end
-}
+end
 
 function string_init() returns string_t*
 	string_t *str = malloc(sizeof(string_t));
@@ -420,7 +425,7 @@ function string_init() returns string_t*
 	return str;
 end
 
-static string_t* custom_string_init(size_t allocationSize) {
+private function custom_string_init(size_t allocationSize) returns string_t*
 	string_t *str = malloc(sizeof(string_t));
 
 	str->text = malloc(allocationSize);
@@ -430,7 +435,7 @@ static string_t* custom_string_init(size_t allocationSize) {
 	str->text_allocated_length = allocationSize;
 
 	return str;
-}
+end
 
 function string_copyvalueof(char *src) returns string_t*
 	int srcLength = strlen(src);
@@ -520,7 +525,7 @@ function string_indexof_s(string_t *src, char *stopSign) returns int
 	return -1;
 end
 
-string_t** string_split(char delimiter, string_t *src) {
+function string_split(char delimiter, string_t *src) returns string_t**
 	// Safety
 	// If the string is length 2 or less, then it is not possible to split the string
 	if src->text_length <= 2 then
@@ -551,7 +556,7 @@ string_t** string_split(char delimiter, string_t *src) {
 	end
 
 	return strList;
-}
+end
 
 function string_equals(string_t *dest, char *src) returns bool
 	int srcLength = strlen(src);
@@ -562,13 +567,13 @@ function string_equals(string_t *dest, char *src) returns bool
 	end	
 end
 
-bool string_equals_s(string_t *dest, string_t *src) {
+function string_equals_s(string_t *dest, string_t *src) returns bool
 	if dest->text_length != src->text_length then
 		return false;
 	or
 		return strncmp(dest->text, src, src->text_length) == 0;
 	end	
-}
+end
 
 function string_equalsignorecase(string_t *dest, char *src) returns bool
 	if dest->text_length != strlen(src) then
@@ -638,11 +643,11 @@ function string_substring_s(int startIndex, int endIndex, string_t *src) returns
 	return newStr;
 end
 
-void string_tolowercase_s(string_t *dest) {
+function string_tolowercase_s(string_t *dest) returns void
 	for i to dest->text_length do i++
 		dest->text[i] = tolower(dest->text[i]);
 	end	
-}
+end
 
 function string_serialize(string_t *src, FILE *stream) returns bool
 	fwrite(&src->text_length, sizeof(int), 1, stream);
@@ -672,7 +677,7 @@ function string_free(void *dest) returns void
 end
 
 // Memory related functions
-static void string_meminspection(size_t addNum, string_t *subject) {
+private function string_meminspection(size_t addNum, string_t *subject) returns void
 	// +1 for accounting the null terminator
 	if subject->text_length + addNum + 1 >= subject->text_allocated_length then
 		size_t newSize = 1.5 * subject->text_allocated_length + addNum + 1;
@@ -685,7 +690,7 @@ static void string_meminspection(size_t addNum, string_t *subject) {
 		subject->text = tempStr;
 		subject->text_allocated_length = newSize;
 	end
-}
+end
 
 // TODO: add a predefined message for errors like index out of bounds exception, etc.
 function throw_exception(exception e, int lineNum, char *message, ...) returns void

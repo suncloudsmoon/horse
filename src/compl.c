@@ -125,6 +125,7 @@ int writeToFile(compiler_t *com);
 
 // Identifiers
 const char *functionIdentifier = "function";
+const char *privateFunctionIdentifier = "private function";
 const char *endIdentifier = "end";
 
 const char *thenKeyword = "then";
@@ -134,6 +135,7 @@ const char *elseIdentifier = "or";
 const char *forIdentifier = "for";
 const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
+const char *takeIdentifier = "take"; // like switch()
 
   int  main()  {
 	char *inputFilename = "src/compl.hr";
@@ -187,7 +189,7 @@ while ( !readLine(com->stream, line) ) {
 	string_free(line);
 }
 
-static bool readLine(FILE *stream, string_t *line) {
+static  bool  readLine(FILE *stream, string_t *line)  {
 	char letter;
 while ( (letter = fgetc(stream)) != EOF && letter != '\n' ) {
 		string_appendchar(line, letter);
@@ -204,13 +206,10 @@ for (int  i  = 0;  i  <  com->allLines->data_length ;  i++) {
 				existingLine->text_length, existingLine);
 		list_add(initialClean, com->cleanedLines);		
 		list_add(split(' ', initialClean), com->parsedLines);
-
-		// Debug
-		// printf("[parse] initialClean: %s\n", initialClean->text);
 }
 }
 
-static list_t* split(char delimiter, string_t *line) {
+static  list_t*  split(char delimiter, string_t *line)  {
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
@@ -228,7 +227,7 @@ if ( isSpecialCharacter(alpha)) {
 	return output;
 }
 
-static bool isSpecialCharacter(char alpha) {
+static  bool  isSpecialCharacter(char alpha)  {
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
 }
 
@@ -246,6 +245,13 @@ if ( string_startswith(line, functionIdentifier)) {
 			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
 			string_printf(parsed, " %s %s {", returnType->text, function->text);
 			com->scope++;
+
+} else if ( string_startswith(line, privateFunctionIdentifier)) {
+			// private function blah() returns void
+			parsed = string_init();
+			string_t *function = string_substring_s(strlen(privateFunctionIdentifier), string_indexof_s(line, "returns"), line);
+			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
+			string_printf(parsed, "static %s %s {", returnType->text, function->text);
 
 } else if ( string_startswith(line, endIdentifier)) {
 			parsed = string_copyvalueof("}");
@@ -311,7 +317,7 @@ for (int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
 	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
 }
 
-static list_t* custom_list_init(size_t mallocSize) {
+static  list_t*  custom_list_init(size_t mallocSize)  {
 	list_t *list = malloc(sizeof(list_t));
 	list->data = (void**) malloc(mallocSize * sizeof(void*));
 
@@ -333,7 +339,7 @@ for (int  i  = 0;  i  <  list->data_length - 1 ;  i++) {
 	list->data_length--;
 }
 
-void list_complete_remove(void (*indivfree)(void*), int index, list_t *list) {
+  void  list_complete_remove(void (*indivfree)(void*), int index, list_t *list)  {
 	(*indivfree)(list->data[index]); // frees it from the respective free method for the unknown type data
 	list_remove(index, list);
 }
@@ -342,8 +348,7 @@ void list_complete_remove(void (*indivfree)(void*), int index, list_t *list) {
 	list->data_length = 0;
 }
 
-bool list_equals(void *destComp, int index,
-bool (*equalsComparator)(void*, void*), list_t *list) {
+  bool  list_equals(void *destComp, int index, bool (*equalsComparator)(void*, void*), list_t *list)  {
 if ( index < 0 || index >= list->data_length) {
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Tried to access a list in index %d that was out of bounds!",
@@ -353,7 +358,7 @@ if ( index < 0 || index >= list->data_length) {
 	return (*equalsComparator)(destComp, list->data[index]);
 }
 
-bool list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) {
+  bool  list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list)  {
 for (int  i  = 0;  i  <  list->data_length ;  i++) {
 if ( (*equalsComparator)(destComp, list->data[i])) {
 			return true;
@@ -362,14 +367,14 @@ if ( (*equalsComparator)(destComp, list->data[i])) {
 	return false;
 }
 
-void list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) {
+  void  list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list)  {
 	fwrite(list->data_length, sizeof(int), 1, stream);
 for (int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indiv)(list->data[i], stream);
 }
 }
 
-list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
+  list_t*  list_deserialize(void* (*indivreverse)(FILE*), FILE *stream)  {
 	int arrayLength;
 	fread(&arrayLength, sizeof(int), 1, stream);
 
@@ -392,7 +397,7 @@ for (int  i  = 0;  i  <  list->data_length ;  i++) {
 	list_free(list);
 }
 
-static void list_meminspector(size_t addNum, list_t *subject) {
+static  void  list_meminspector(size_t addNum, list_t *subject)  {
 if ( subject->data_length + addNum >= subject->data_allocated_length) {
 		size_t newSize = 1.5 * subject->data_allocated_length + addNum;
 		void **new_ptr = (void**) realloc(subject->data,
@@ -420,7 +425,7 @@ if ( new_ptr == NULL) {
 	return str;
 }
 
-static string_t* custom_string_init(size_t allocationSize) {
+static  string_t*  custom_string_init(size_t allocationSize)  {
 	string_t *str = malloc(sizeof(string_t));
 
 	str->text = malloc(allocationSize);
@@ -520,7 +525,7 @@ if ( found) {
 	return -1;
 }
 
-string_t** string_split(char delimiter, string_t *src) {
+  string_t**  string_split(char delimiter, string_t *src)  {
 	// Safety
 	// If the string is length 2 or less, then it is not possible to split the string
 if ( src->text_length <= 2) {
@@ -562,7 +567,7 @@ if ( dest->text_length != srcLength) {
 }
 }
 
-bool string_equals_s(string_t *dest, string_t *src) {
+  bool  string_equals_s(string_t *dest, string_t *src)  {
 if ( dest->text_length != src->text_length) {
 		return false;
 } else {
@@ -638,7 +643,7 @@ if ( totalAppend < 0 || totalAppend > src->text_length) {
 	return newStr;
 }
 
-void string_tolowercase_s(string_t *dest) {
+  void  string_tolowercase_s(string_t *dest)  {
 for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 		dest->text[i] = tolower(dest->text[i]);
 }
@@ -672,7 +677,7 @@ for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 }
 
 // Memory related functions
-static void string_meminspection(size_t addNum, string_t *subject) {
+static  void  string_meminspection(size_t addNum, string_t *subject)  {
 	// +1 for accounting the null terminator
 if ( subject->text_length + addNum + 1 >= subject->text_allocated_length) {
 		size_t newSize = 1.5 * subject->text_allocated_length + addNum + 1;
