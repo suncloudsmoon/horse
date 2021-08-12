@@ -249,14 +249,14 @@ function compile(compiler_t *com) returns void
 			com->scope--;
 
 		or if string_startswith(line, ifIdentifier) then
-			// iif blah then
+			// if blah then
 			parsed = string_init();
-			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 1, line);
+			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "if (%s) {", middle->text);
 
 		or if string_startswith(line, elseIfIdentifier) then
 			parsed = string_init();
-			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 1, line);
+			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "} else if (%s) {", middle->text);
 		
 		or if string_startswith(line, elseIdentifier) then
