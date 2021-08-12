@@ -132,6 +132,8 @@ const char *ifIdentifier = "if"; // for now
 const char *elseIfIdentifier = "or if";
 const char *elseIdentifier = "or";
 
+const char *forIdentifier = "for";
+
 function main() returns int
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
@@ -214,7 +216,6 @@ static list_t* split(char delimiter, string_t *line) {
 		char alpha = line->text[i];
 		if isSpecialCharacter(alpha) then
 			isSpecial = !isSpecial;
-		end	
 		or if !isSpecial && alpha == delimiter then
 			list_add(string_copyvalueof_s(temp), output);
 			string_reset(temp);
@@ -242,30 +243,25 @@ function compile(compiler_t *com) returns void
 			parsed = compileFunctionHeader(tokens);
 			com->scope++;
 
-		end
 		or if string_startswith(line, endIdentifier) then
 			parsed = string_copyvalueof("}");
 			com->scope--;
-		
-		end
+
 		or if string_startswith(line, ifIdentifier) then
 			// iif blah then
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 1, line);
 			string_printf(parsed, "if (%s) {", middle->text);
-			
-		end 
+
 		or if string_startswith(line, elseIfIdentifier) then
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 1, line);
-			string_printf(parsed, "else if (%s) {", middle->text);
+			string_printf(parsed, "} else if (%s) {", middle->text);
 		
-		end
 		or if string_startswith(line, elseIdentifier) then
 			parsed = string_init();
-			string_append(parsed, "else {");
+			string_append(parsed, "} else {");
 
-		end
 		or
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 		end
@@ -455,7 +451,6 @@ function string_printf(string_t *dest, char *format, ...) returns void
 		if first == '%' && second == 's' then
 			arg = va_arg(args, char*);
 			i++;
-		end 
 		or
 			arg = malloc(2 * sizeof(char));
 			arg[0] = first;
@@ -528,7 +523,6 @@ bool string_equals(string_t *dest, char *src) {
 	int srcLength = strlen(src);
 	if dest->text_length != srcLength then
 		return false;
-	end
 	or
 		return strncmp(dest->text, src, srcLength) == 0;
 	end	
@@ -537,7 +531,6 @@ bool string_equals(string_t *dest, char *src) {
 bool string_equals_s(string_t *dest, string_t *src) {
 	if dest->text_length != src->text_length then
 		return false;
-	end	
 	or
 		return strncmp(dest->text, src, src->text_length) == 0;
 	end	
@@ -546,7 +539,6 @@ bool string_equals_s(string_t *dest, string_t *src) {
 bool string_equalsignorecase(string_t *dest, char *src) {
 	if dest->text_length != strlen(src) then
 		return false;
-	end
 	or 
 		for (int i = 0; i < dest->text_length; i++) {
 			if tolower(dest->text[i]) != tolower(src[i]) then
@@ -560,7 +552,6 @@ bool string_equalsignorecase(string_t *dest, char *src) {
 bool string_equalsignorecase_s(string_t *dest, string_t *src) {
 	if dest->text_length != src->text_length then
 		return false;
-	end
 	or
 		for (int i = 0; i < dest->text_length; i++) {
 			if (tolower(dest->text[i]) != tolower(src->text[i])) then
@@ -673,8 +664,7 @@ void throw_exception(exception e, int lineNum, char *message, ...) {
 	if lineNum == -1 then
 		strncpy(cMessage, "Internal Error [", AVG_STRING_SIZE);
 		vsnprintf(cMessage, AVG_STRING_SIZE, message, args);
-		strcat(cMessage, "]");
-	end 
+		strcat(cMessage, "]"); 
 	or 
 		snprintf(cMessage, AVG_STRING_SIZE, "Line #%d", lineNum);
 	end

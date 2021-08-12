@@ -132,6 +132,8 @@ const char *ifIdentifier = "if"; // for now
 const char *elseIfIdentifier = "or if";
 const char *elseIdentifier = "or";
 
+const char *forIdentifier = "for";
+
  int  main() {
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
@@ -214,8 +216,7 @@ static list_t* split(char delimiter, string_t *line) {
 		char alpha = line->text[i];
 if ( isSpecialCharacter(alpha) ) {
 			isSpecial = !isSpecial;
-}
-else if ( !isSpecial && alpha == delimiter ) {
+} else if ( !isSpecial && alpha == delimiter ) {
 			list_add(string_copyvalueof_s(temp), output);
 			string_reset(temp);
 }
@@ -242,31 +243,26 @@ if ( string_startswith(line, functionIdentifier) ) {
 			parsed = compileFunctionHeader(tokens);
 			com->scope++;
 
-}
-else if ( string_startswith(line, endIdentifier) ) {
+} else if ( string_startswith(line, endIdentifier) ) {
 			parsed = string_copyvalueof("}");
 			com->scope--;
-		
-}
-else if ( string_startswith(line, ifIdentifier) ) {
+
+} else if ( string_startswith(line, ifIdentifier) ) {
 			// iif blah then
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 1, line);
 			string_printf(parsed, "if (%s) {", middle->text);
-			
-}
-else if ( string_startswith(line, elseIfIdentifier) ) {
+
+} else if ( string_startswith(line, elseIfIdentifier) ) {
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 1, line);
-			string_printf(parsed, "else if (%s) {", middle->text);
+			string_printf(parsed, "} else if (%s) {", middle->text);
 		
-}
-else if ( string_startswith(line, elseIdentifier) ) {
+} else if ( string_startswith(line, elseIdentifier) ) {
 			parsed = string_init();
-			string_append(parsed, "else {");
+			string_append(parsed, "} else {");
 
-}
-else {
+} else {
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 }
 		list_add(parsed, com->compiledLines);
@@ -455,8 +451,7 @@ static string_t* custom_string_init(size_t allocationSize) {
 if ( first == '%' && second == 's' ) {
 			arg = va_arg(args, char*);
 			i++;
-}
-else {
+} else {
 			arg = malloc(2 * sizeof(char));
 			arg[0] = first;
 			arg[1] = '\0';
@@ -528,8 +523,7 @@ bool string_equals(string_t *dest, char *src) {
 	int srcLength = strlen(src);
 if ( dest->text_length != srcLength ) {
 		return false;
-}
-else {
+} else {
 		return strncmp(dest->text, src, srcLength) == 0;
 }
 }
@@ -537,8 +531,7 @@ else {
 bool string_equals_s(string_t *dest, string_t *src) {
 if ( dest->text_length != src->text_length ) {
 		return false;
-}
-else {
+} else {
 		return strncmp(dest->text, src, src->text_length) == 0;
 }
 }
@@ -546,8 +539,7 @@ else {
 bool string_equalsignorecase(string_t *dest, char *src) {
 if ( dest->text_length != strlen(src) ) {
 		return false;
-}
-else {
+} else {
 		for (int i = 0; i < dest->text_length; i++) {
 if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 				return false;
@@ -560,8 +552,7 @@ if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 bool string_equalsignorecase_s(string_t *dest, string_t *src) {
 if ( dest->text_length != src->text_length ) {
 		return false;
-}
-else {
+} else {
 		for (int i = 0; i < dest->text_length; i++) {
 if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
 				return false;
@@ -673,9 +664,8 @@ void throw_exception(exception e, int lineNum, char *message, ...) {
 if ( lineNum == -1 ) {
 		strncpy(cMessage, "Internal Error [", AVG_STRING_SIZE);
 		vsnprintf(cMessage, AVG_STRING_SIZE, message, args);
-		strcat(cMessage, "]");
-}
-else {
+		strcat(cMessage, "]"); 
+} else {
 		snprintf(cMessage, AVG_STRING_SIZE, "Line #%d", lineNum);
 }
 	va_end(args);
