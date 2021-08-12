@@ -121,7 +121,6 @@ void parse(compiler_t *com);
 static list_t* split(char delimiter, string_t *line);
 static bool isSpecialCharacter(char alpha);
 void compile(compiler_t *com);
-static string_t* compileFunctionHeader(list_t *tokens);
 int writeToFile(compiler_t *com);
 
 const char *functionIdentifier = "function";
@@ -241,7 +240,11 @@ function compile(compiler_t *com) returns void
 		// printf("[compile] cleanLine: %s\n", line->text);
 
 		if string_startswith(line, functionIdentifier) then
-			parsed = compileFunctionHeader(tokens);
+			// function blah() returns void
+			parsed = string_init();
+			string_t *function = string_substring_s(strlen(functionIdentifier), string_indexof_s(line, "returns"), line);
+			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
+			string_printf(parsed, " %s %s {", returnType->text, function->text);
 			com->scope++;
 
 		or if string_startswith(line, endIdentifier) then
@@ -276,14 +279,6 @@ function compile(compiler_t *com) returns void
 		list_add(parsed, com->compiledLines);
 	end
 end	
-
-static string_t* compileFunctionHeader(list_t *tokens) {
-	// unction something() returns int
-	char functHeader[1000];
-	snprintf(functHeader, 1000, "%s %s {", ((string_t*) tokens->data[3])->text,
-			((string_t*) tokens->data[1])->text);
-	return string_copyvalueof(functHeader);
-}
 
 function writeToFile(compiler_t *com) returns int
 	FILE *output = com->outputFile;

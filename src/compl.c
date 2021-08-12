@@ -121,7 +121,6 @@ void parse(compiler_t *com);
 static list_t* split(char delimiter, string_t *line);
 static bool isSpecialCharacter(char alpha);
 void compile(compiler_t *com);
-static string_t* compileFunctionHeader(list_t *tokens);
 int writeToFile(compiler_t *com);
 
 const char *functionIdentifier = "function";
@@ -135,7 +134,7 @@ const char *elseIdentifier = "or";
 
 const char *forIdentifier = "for";
 
- int  main() {
+  int  main()  {
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
 	FILE *input = fopen(inputFilename, "r");
@@ -147,7 +146,7 @@ const char *forIdentifier = "for";
 	return 0;
 }
 
- compiler_t*  compiler_init(FILE *inputFile, FILE *outputFile) {
+  compiler_t*  compiler_init(FILE *inputFile, FILE *outputFile)  {
 	compiler_t *com = malloc(sizeof(compiler_t));
 	com->allLines = list_init();
 	com->cleanedLines = list_init();
@@ -159,16 +158,16 @@ const char *forIdentifier = "for";
 	return com;
 }
 
- void  compiler_free(compiler_t *com) {
+  void  compiler_free(compiler_t *com)  {
 	list_complete_free(&string_free, com->allLines);
-for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
+for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_complete_free(&string_free, com->parsedLines->data[i]);
 }
 	list_complete_free(&string_free, com->compiledLines);
 	free(com);
 }
 
- void  ignition(compiler_t *com) {
+  void  ignition(compiler_t *com)  {
 	printf("[ignition] program starting!\n");
 	readAllLines(com);
 	parse(com);
@@ -176,7 +175,7 @@ for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 	writeToFile(com);
 }
 
- void  readAllLines(compiler_t *com) {
+  void  readAllLines(compiler_t *com)  {
 	string_t *line = string_init();
 	while (!readLine(com->stream, line)) {
 		list_add(string_copyvalueof_s(line), com->allLines);
@@ -194,8 +193,8 @@ static bool readLine(FILE *stream, string_t *line) {
 	return letter == EOF;
 }
 
- void  parse(compiler_t *com) {
-for (int  i  = 0;  i  <  com->allLines->data_length ;  i++) {
+  void  parse(compiler_t *com)  {
+for (int  i  = 0;  i  <  com->allLines->data_length ;  i++) {
 		string_t *existingLine = (string_t*) com->allLines->data[i];
 		int firstLetter = strcspn(existingLine->text,
 				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
@@ -213,11 +212,11 @@ static list_t* split(char delimiter, string_t *line) {
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
-for (int  i  = 0;  i  <  line->text_length ;  i++) {
+for (int  i  = 0;  i  <  line->text_length ;  i++) {
 		char alpha = line->text[i];
-if ( isSpecialCharacter(alpha) ) {
+if ( isSpecialCharacter(alpha)) {
 			isSpecial = !isSpecial;
-} else if ( !isSpecial && alpha == delimiter ) {
+} else if ( !isSpecial && alpha == delimiter) {
 			list_add(string_copyvalueof_s(temp), output);
 			string_reset(temp);
 }
@@ -231,39 +230,43 @@ static bool isSpecialCharacter(char alpha) {
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
 }
 
- void  compile(compiler_t *com) {
+  void  compile(compiler_t *com)  {
 	string_t *parsed;
-for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
+for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
 		// printf("[compile] tokens: %s\n", firstToken->text);
 		// printf("[compile] cleanLine: %s\n", line->text);
 
-if ( string_startswith(line, functionIdentifier) ) {
-			parsed = compileFunctionHeader(tokens);
+if ( string_startswith(line, functionIdentifier)) {
+			// function blah() returns void
+			parsed = string_init();
+			string_t *function = string_substring_s(strlen(functionIdentifier), string_indexof_s(line, "returns"), line);
+			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
+			string_printf(parsed, " %s %s {", returnType->text, function->text);
 			com->scope++;
 
-} else if ( string_startswith(line, endIdentifier) ) {
+} else if ( string_startswith(line, endIdentifier)) {
 			parsed = string_copyvalueof("}");
 			com->scope--;
 
-} else if ( string_startswith(line, ifIdentifier) ) {
+} else if ( string_startswith(line, ifIdentifier)) {
 			// if blah then
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "if (%s) {", middle->text);
 
-} else if ( string_startswith(line, elseIfIdentifier) ) {
+} else if ( string_startswith(line, elseIfIdentifier)) {
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "} else if (%s) {", middle->text);
 		
-} else if ( string_startswith(line, elseIdentifier) ) {
+} else if ( string_startswith(line, elseIdentifier)) {
 			parsed = string_init();
 			string_append(parsed, "} else {");
 
-} else if ( string_startswith(line, forIdentifier) ) {
+} else if ( string_startswith(line, forIdentifier)) {
 			// for i to 5 do i++
 			parsed = string_init();
 			string_t *i = string_substring_s(strlen(forIdentifier), string_indexof_s(line, "to"), line);
@@ -277,17 +280,9 @@ if ( string_startswith(line, functionIdentifier) ) {
 }
 }
 
-static string_t* compileFunctionHeader(list_t *tokens) {
-	// unction something() returns int
-	char functHeader[1000];
-	snprintf(functHeader, 1000, "%s %s {", ((string_t*) tokens->data[3])->text,
-			((string_t*) tokens->data[1])->text);
-	return string_copyvalueof(functHeader);
-}
-
- int  writeToFile(compiler_t *com) {
+  int  writeToFile(compiler_t *com)  {
 	FILE *output = com->outputFile;
-for (int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
+for (int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
 		fprintf(output, "%s\n",
 				((string_t*) com->compiledLines->data[i])->text);		
 }
@@ -297,7 +292,7 @@ for (int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
 
 ////// LIBRARIES //////
 
- list_t*  list_init() {
+  list_t*  list_init()  {
 	list_t *list = malloc(sizeof(list_t));
 	list->data = (void**) malloc(LIST_MANAGER_ALLOC_SIZE * sizeof(void*));
 
@@ -313,15 +308,15 @@ static list_t* custom_list_init(size_t mallocSize) {
 	list->data_allocated_length = mallocSize;
 }
 
- void  list_add(void *item, list_t *list) {
+  void  list_add(void *item, list_t *list)  {
 	list_meminspector(1, list);
 	list->data[list->data_length] = item;
 	list->data_length++;
 }
 
- void  list_remove(int index, list_t *list) {
+  void  list_remove(int index, list_t *list)  {
 	// TODO: find a more efficient implementation of this
-for (int  i  = 0;  i  <  list->data_length - 1 ;  i++) {
+for (int  i  = 0;  i  <  list->data_length - 1 ;  i++) {
 		list->data[i] = list->data[i + 1];
 }
 	list->data_length--;
@@ -332,13 +327,13 @@ void list_complete_remove(void (*indivfree)(void*), int index, list_t *list) {
 	list_remove(index, list);
 }
 
- void  list_clear(list_t *list) {
+  void  list_clear(list_t *list)  {
 	list->data_length = 0;
 }
 
 bool list_equals(void *destComp, int index,
 bool (*equalsComparator)(void*, void*), list_t *list) {
-if ( index < 0 || index >= list->data_length ) {
+if ( index < 0 || index >= list->data_length) {
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Tried to access a list in index %d that was out of bounds!",
 				index);
@@ -348,8 +343,8 @@ if ( index < 0 || index >= list->data_length ) {
 }
 
 bool list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) {
-for (int  i  = 0;  i  <  list->data_length ;  i++) {
-if ( (*equalsComparator)(destComp, list->data[i]) ) {
+for (int  i  = 0;  i  <  list->data_length ;  i++) {
+if ( (*equalsComparator)(destComp, list->data[i])) {
 			return true;
 }
 }
@@ -358,7 +353,7 @@ if ( (*equalsComparator)(destComp, list->data[i]) ) {
 
 void list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) {
 	fwrite(list->data_length, sizeof(int), 1, stream);
-for (int  i  = 0;  i  <  list->data_length ;  i++) {
+for (int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indiv)(list->data[i], stream);
 }
 }
@@ -368,30 +363,30 @@ list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
 	fread(&arrayLength, sizeof(int), 1, stream);
 
 	list_t *list = custom_list_init(arrayLength);
-for (int  i  = 0;  i  <  arrayLength ;  i++) {
+for (int  i  = 0;  i  <  arrayLength ;  i++) {
 		list_add((*indivreverse)(stream), list);
 }
 	return list;
 }
 
- void  list_free(list_t *list) {
+  void  list_free(list_t *list)  {
 	free(list->data);
 	free(list);
 }
 
- void  list_complete_free(void (*indivfree)(void*), list_t *list) {
-for (int  i  = 0;  i  <  list->data_length ;  i++) {
+  void  list_complete_free(void (*indivfree)(void*), list_t *list)  {
+for (int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indivfree)(list->data[i]);
 }
 	list_free(list);
 }
 
 static void list_meminspector(size_t addNum, list_t *subject) {
-if ( subject->data_length + addNum >= subject->data_allocated_length ) {
+if ( subject->data_length + addNum >= subject->data_allocated_length) {
 		size_t newSize = 1.5 * subject->data_allocated_length + addNum;
 		void **new_ptr = (void**) realloc(subject->data,
 				newSize * sizeof(void*));
-if ( new_ptr == NULL ) {
+if ( new_ptr == NULL) {
 			throw_exception(NULL_POINTER_EXCEPTION, -1,
 					"Unable to allocate memory for list with length %d!",
 					subject->data_length);
@@ -402,7 +397,7 @@ if ( new_ptr == NULL ) {
 }
 }
 
- string_t*  string_init() {
+  string_t*  string_init()  {
 	string_t *str = malloc(sizeof(string_t));
 
 	str->text = malloc(STRING_ALLOCATION_SIZE * sizeof(char));
@@ -426,7 +421,7 @@ static string_t* custom_string_init(size_t allocationSize) {
 	return str;
 }
 
- string_t*  string_copyvalueof(char *src) {
+  string_t*  string_copyvalueof(char *src)  {
 	int srcLength = strlen(src);
 
 	string_t *dest = malloc(sizeof(string_t));
@@ -437,7 +432,7 @@ static string_t* custom_string_init(size_t allocationSize) {
 	return dest;
 }
 
- string_t*  string_copyvalueof_s(string_t *src) {
+  string_t*  string_copyvalueof_s(string_t *src)  {
 	string_t *dest = malloc(sizeof(string_t));
 	dest->text = strdup(src->text);
 	dest->text_length = src->text_length;
@@ -446,15 +441,15 @@ static string_t* custom_string_init(size_t allocationSize) {
 	return dest;
 }
 
- void  string_printf(string_t *dest, char *format, ...) {
+  void  string_printf(string_t *dest, char *format, ...)  {
 	va_list args;
 	va_start(args, format);
 	int argsLength = strlen(format);
-for (int  i  = 0;  i  <  argsLength ;  i++) {
+for (int  i  = 0;  i  <  argsLength ;  i++) {
 		char first = format[i];
 		char second = (i + 1 < argsLength) ? format[i+1] : NULL;
 		char *arg;
-if ( first == '%' && second == 's' ) {
+if ( first == '%' && second == 's') {
 			arg = va_arg(args, char*);
 			i++;
 } else {
@@ -470,7 +465,7 @@ if ( first == '%' && second == 's' ) {
 	va_end(args);
 }
 
- void  string_append(string_t *dest, char *src) {
+  void  string_append(string_t *dest, char *src)  {
 	int srcLength = strlen(src);
 	string_meminspection(srcLength, dest);
 
@@ -478,13 +473,13 @@ if ( first == '%' && second == 's' ) {
 	dest->text_length += srcLength;
 }
 
- void  string_append_s(string_t *dest, string_t *src) {
+  void  string_append_s(string_t *dest, string_t *src)  {
 	string_meminspection(src->text_length, dest);
 	strncat(dest->text, src->text, src->text_length);
 	dest->text_length += src->text_length;
 }
 
- void  string_appendchar(string_t *dest, char letter) {
+  void  string_appendchar(string_t *dest, char letter)  {
 	string_meminspection(1, dest);
 	char text[2];
 	text[0] = letter;
@@ -496,17 +491,17 @@ if ( first == '%' && second == 's' ) {
 /*
 	returns -1 if no stopSign was found
 */
- int  string_indexof_s(string_t *src, char *stopSign) {
+  int  string_indexof_s(string_t *src, char *stopSign)  {
 	int stopSignLength = strlen(stopSign);
 	bool found = true;
-for (int  i  = 0;  i  <  src->text_length - stopSignLength ;  i++) {
-for (int  j  = 0;  j  <  stopSignLength ;  j++) {
-if ( src->text[i+j] != stopSign[j] ) {
+for (int  i  = 0;  i  <  src->text_length - stopSignLength ;  i++) {
+for (int  j  = 0;  j  <  stopSignLength ;  j++) {
+if ( src->text[i+j] != stopSign[j]) {
 				found = false;
 				break;
 }
 }
-if ( found ) {
+if ( found) {
 			return i;
 }
 		found = true;
@@ -517,7 +512,7 @@ if ( found ) {
 string_t** string_split(char delimiter, string_t *src) {
 	// Safety
 	// If the string is length 2 or less, then it is not possible to split the string
-if ( src->text_length <= 2 ) {
+if ( src->text_length <= 2) {
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Unable to substring a string with %d length!",
 				src->text_length);
@@ -532,24 +527,24 @@ if ( src->text_length <= 2 ) {
 	delimiterText[1] = '\0';
 	int splitIndex = strcspn(src->text, delimiterText);
 
-if ( splitIndex == src->text ) {
+if ( splitIndex == src->text) {
 		return NULL;
 }
 
-for (int  i  = 0;  i  <  splitIndex ;  i++) {
+for (int  i  = 0;  i  <  splitIndex ;  i++) {
 		string_appendchar(strList[0], src->text[i]);
 }
 	// for splitIndex + 1 to src->text_length do i++
-for (int  i  = 0;  i  <  src->text_length ;  i++) {
+for (int  i  = 0;  i  <  src->text_length ;  i++) {
 		string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
 }
 
 	return strList;
 }
 
- bool  string_equals(string_t *dest, char *src) {
+  bool  string_equals(string_t *dest, char *src)  {
 	int srcLength = strlen(src);
-if ( dest->text_length != srcLength ) {
+if ( dest->text_length != srcLength) {
 		return false;
 } else {
 		return strncmp(dest->text, src, srcLength) == 0;
@@ -557,19 +552,19 @@ if ( dest->text_length != srcLength ) {
 }
 
 bool string_equals_s(string_t *dest, string_t *src) {
-if ( dest->text_length != src->text_length ) {
+if ( dest->text_length != src->text_length) {
 		return false;
 } else {
 		return strncmp(dest->text, src, src->text_length) == 0;
 }
 }
 
- bool  string_equalsignorecase(string_t *dest, char *src) {
-if ( dest->text_length != strlen(src) ) {
+  bool  string_equalsignorecase(string_t *dest, char *src)  {
+if ( dest->text_length != strlen(src)) {
 		return false;
 } else {
-for (int  i  = 0;  i  <  dest->text_length ;  i++) {
-if ( tolower(dest->text[i]) != tolower(src[i]) ) {
+for (int  i  = 0;  i  <  dest->text_length ;  i++) {
+if ( tolower(dest->text[i]) != tolower(src[i])) {
 				return false;
 }
 }
@@ -577,12 +572,12 @@ if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 }
 }
 
- bool  string_equalsignorecase_s(string_t *dest, string_t *src) {
-if ( dest->text_length != src->text_length ) {
+  bool  string_equalsignorecase_s(string_t *dest, string_t *src)  {
+if ( dest->text_length != src->text_length) {
 		return false;
 } else {
-for (int  i  = 0;  i  <  dest->text_length ;  i++) {
-if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
+for (int  i  = 0;  i  <  dest->text_length ;  i++) {
+if ( (tolower(dest->text[i]) != tolower(src->text[i]))) {
 				return false;
 }
 }
@@ -590,35 +585,35 @@ if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
 }
 }
 
- bool  string_startswith_s(string_t *src, string_t *search) {
-if ( search->text_length > src->text_length ) {
+  bool  string_startswith_s(string_t *src, string_t *search)  {
+if ( search->text_length > src->text_length) {
 		return false;
 }
-for (int  i  = 0;  i  <  search->text_length ;  i++) {
-if ( src->text[i] != search->text[i] ) {
+for (int  i  = 0;  i  <  search->text_length ;  i++) {
+if ( src->text[i] != search->text[i]) {
 			return false;
 }
 }
 	return true;
 }
 
- bool  string_startswith(string_t *src, char *search) {
+  bool  string_startswith(string_t *src, char *search)  {
 	int searchLength = strlen(search);
-if ( searchLength > src->text_length ) {
+if ( searchLength > src->text_length) {
 		return false;
 }
-for (int  i  = 0;  i  <  searchLength ;  i++) {
-if ( src->text[i] != search[i] ) {
+for (int  i  = 0;  i  <  searchLength ;  i++) {
+if ( src->text[i] != search[i]) {
 			return false;
 }
 }
 	return true;
 }
 
- string_t*  string_substring_s(int startIndex, int endIndex, string_t *src) {
+  string_t*  string_substring_s(int startIndex, int endIndex, string_t *src)  {
 	size_t totalAppend = endIndex - startIndex;
 // Safety
-if ( totalAppend < 0 || totalAppend > src->text_length ) {
+if ( totalAppend < 0 || totalAppend > src->text_length) {
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Unable to substring a string starting from index %d and ending %d",
 				startIndex, endIndex);
@@ -633,17 +628,17 @@ if ( totalAppend < 0 || totalAppend > src->text_length ) {
 }
 
 void string_tolowercase_s(string_t *dest) {
-for (int  i  = 0;  i  <  dest->text_length ;  i++) {
+for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 		dest->text[i] = tolower(dest->text[i]);
 }
 }
 
- bool  string_serialize(string_t *src, FILE *stream) {
+  bool  string_serialize(string_t *src, FILE *stream)  {
 	fwrite(&src->text_length, sizeof(int), 1, stream);
 	fwrite(src->text, sizeof(char), src->text_length, stream);
 }
 
- string_t*  string_deserialize(FILE *stream) {
+  string_t*  string_deserialize(FILE *stream)  {
 	int textLength;
 	fread(&textLength, sizeof(int), 1, stream);
 
@@ -654,12 +649,12 @@ for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 	return str;
 }
 
- void  string_reset(string_t *dest) {
+  void  string_reset(string_t *dest)  {
 	dest->text[0] = '\0';
 	dest->text_length = 0;
 }
 
- void  string_free(void *dest) {
+  void  string_free(void *dest)  {
 	free(((string_t*) dest)->text);
 // Free the structure itself
 	free(((string_t*) dest));
@@ -668,11 +663,11 @@ for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 // Memory related functions
 static void string_meminspection(size_t addNum, string_t *subject) {
 	// +1 for accounting the null terminator
-if ( subject->text_length + addNum + 1 >= subject->text_allocated_length ) {
+if ( subject->text_length + addNum + 1 >= subject->text_allocated_length) {
 		size_t newSize = 1.5 * subject->text_allocated_length + addNum + 1;
 		char *tempStr = (char *) realloc(subject->text, newSize);
 		// Safety
-if ( tempStr == NULL ) {
+if ( tempStr == NULL) {
 			throw_exception(NULL_POINTER_EXCEPTION, -1,
 					"Unable to allocate memory for string while doing meminspection!\n");
 }
@@ -682,11 +677,11 @@ if ( tempStr == NULL ) {
 }
 
 // TODO: add a predefined message for errors like index out of bounds exception, etc.
- void  throw_exception(exception e, int lineNum, char *message, ...) {
+  void  throw_exception(exception e, int lineNum, char *message, ...)  {
 	va_list args;
 	va_start(args, message);
 	char cMessage[AVG_STRING_SIZE];
-if ( lineNum == -1 ) {
+if ( lineNum == -1) {
 		strncpy(cMessage, "Internal Error [", AVG_STRING_SIZE);
 		vsnprintf(cMessage, AVG_STRING_SIZE, message, args);
 		strcat(cMessage, "]"); 
