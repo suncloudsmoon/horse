@@ -99,11 +99,14 @@ void list_complete_free(void (*indivfree)(void*), list_t *list);
 
 typedef struct {
 	list_t *allLines; // List of all lines
+	list_t *cleanedLines;
 	list_t *parsedLines; // List of parsed lines
 	list_t *compiledLines;
 
 	FILE *stream;
 	FILE *outputFile;
+
+	int scope;
 } compiler_t;
 
 // Compiler Functions
@@ -120,6 +123,7 @@ static string_t* compileFunctionHeader(list_t *tokens);
 int writeToFile(compiler_t *com);
 
 const char *functionIdentifier = "function";
+const char *endIdentifier = "end";
 
 function main() returns int
 	char *inputFilename = "src/compl.hr";
@@ -131,37 +135,38 @@ function main() returns int
 	ignition(com);
 	compiler_free(com);
 	return 0;
-}
+end
 
 function compiler_init(FILE *inputFile, FILE *outputFile) returns compiler_t*
 	compiler_t *com = malloc(sizeof(compiler_t));
 	com->allLines = list_init();
+	com->cleanedLines = list_init();
 	com->parsedLines = list_init();
 	com->compiledLines = list_init();
 
 	com->stream = inputFile;
 	com->outputFile = outputFile;
 	return com;
-}
+end
 
-void compiler_free(compiler_t *com) {
+function compiler_free(compiler_t *com) returns void
 	list_complete_free(&string_free, com->allLines);
 	for (int i = 0; i < com->parsedLines->data_length; i++) {
 		list_complete_free(&string_free, com->parsedLines->data[i]);
 	}
 	list_complete_free(&string_free, com->compiledLines);
 	free(com);
-}
+end
 
-void ignition(compiler_t *com) {
+function ignition(compiler_t *com) returns void
 	printf("[ignition] program starting!\n");
 	readAllLines(com);
 	parse(com);
 	compile(com);
 	writeToFile(com);
-}
+end
 
-void readAllLines(compiler_t *com) {
+function readAllLines(compiler_t *com) returns void
 	string_t *line = string_init();
 	while (!readLine(com->stream, line)) {
 		list_add(string_copyvalueof_s(line), com->allLines);
@@ -170,7 +175,7 @@ void readAllLines(compiler_t *com) {
 		string_reset(line);
 	}
 	string_free(line);
-}
+end
 
 static bool readLine(FILE *stream, string_t *line) {
 	char letter;
@@ -179,19 +184,20 @@ static bool readLine(FILE *stream, string_t *line) {
 	return letter == EOF;
 }
 
-void parse(compiler_t *com) {
+function parse(compiler_t *com) returns void
 	for (int i = 0; i < com->allLines->data_length; i++) {
 		string_t *existingLine = (string_t*) com->allLines->data[i];
 		int firstLetter = strcspn(existingLine->text,
-				"abcdefghijklmnopqrstuvwxyz0123456789#");
+				"abcdefghijklmnopqrstuvwxyz0123456789#{}");
 		string_t *initialClean = string_substring_s(firstLetter,
 				existingLine->text_length, existingLine);
+		list_add(initialClean, com->cleanedLines);		
 		list_add(split(' ', initialClean), com->parsedLines);
 
 		// Debug
 		printf("[parse] initialClean: %s\n", initialClean->text);
 	}
-}
+end
 
 static list_t* split(char delimiter, string_t *line) {
 	list_t *output = list_init();
@@ -215,13 +221,21 @@ static bool isSpecialCharacter(char alpha) {
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
 }
 
-void compile(compiler_t *com) {
+function compile(compiler_t *com) returns void
 	string_t *parsed;
 	for (int i = 0; i < com->parsedLines->data_length; i++) {
-		list_t *tokens = com->parsedLines->data[i];
-		if (string_startswith((string_t*) tokens->data[0],
-				functionIdentifier)) {
+		list_t *tokens = (list_t *) com->parsedLines->data[i];
+		string_t *firstToken = (string_t*) tokens->data[0];
+		string_t *line = (string_t*) com->cleanedLines->data[i];
+
+		if (string_startswith(firstToken, functionIdentifier)) {
 			parsed = compileFunctionHeader(tokens);
+			com->scope++;
+
+		} else if (string_startswith(firstToken, endIdentifier)) {
+			parsed = string_copyvalueof("}");
+			com->scope--;
+		
 		} else {
 			parsed = (string_t*) com->allLines->data[i];
 		}
@@ -230,7 +244,7 @@ void compile(compiler_t *com) {
 		printf("[compile] parsed: %s\n",
 				((string_t*) com->compiledLines->data[i])->text);
 	}
-}
+end	
 
 static string_t* compileFunctionHeader(list_t *tokens) {
 	// unction something() returns int
@@ -240,7 +254,7 @@ static string_t* compileFunctionHeader(list_t *tokens) {
 	return string_copyvalueof(functHeader);
 }
 
-int writeToFile(compiler_t *com) {
+function writeToFile(compiler_t *com) returns int
 	FILE *output = com->outputFile;
 	for (int i = 0; i < com->compiledLines->data_length; i++) {
 		fprintf(output, "%s\n",
@@ -248,17 +262,17 @@ int writeToFile(compiler_t *com) {
 	}
 	printf("Successfully wrote to File!");
 	return fclose(output);
-}
+end
 
 ////// LIBRARIES //////
 
-list_t* list_init() {
+function list_init() returns list_t*
 	list_t *list = malloc(sizeof(list_t));
 	list->data = (void**) malloc(LIST_MANAGER_ALLOC_SIZE * sizeof(void*));
 
 	list->data_length = 0;
 	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
-}
+end
 
 static list_t* custom_list_init(size_t mallocSize) {
 	list_t *list = malloc(sizeof(list_t));
@@ -268,28 +282,28 @@ static list_t* custom_list_init(size_t mallocSize) {
 	list->data_allocated_length = mallocSize;
 }
 
-void list_add(void *item, list_t *list) {
+function list_add(void *item, list_t *list) returns void
 	list_meminspector(1, list);
 	list->data[list->data_length] = item;
 	list->data_length++;
-}
+end
 
-void list_remove(int index, list_t *list) {
+function list_remove(int index, list_t *list) returns void
 	// TODO: find a more efficient implementation of this
 	for (int i = index; i < list->data_length - 1; i++)
 		list->data[i] = list->data[i + 1];
 
 	list->data_length--;
-}
+end
 
 void list_complete_remove(void (*indivfree)(void*), int index, list_t *list) {
 	(*indivfree)(list->data[index]); // frees it from the respective free method for the unknown type data
 	list_remove(index, list);
 }
 
-void list_clear(list_t *list) {
+function list_clear(list_t *list) returns void
 	list->data_length = 0;
-}
+end
 
 bool list_equals(void *destComp, int index,
 bool (*equalsComparator)(void*, void*), list_t *list) {
@@ -326,16 +340,16 @@ list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
 	return list;
 }
 
-void list_free(list_t *list) {
+function list_free(list_t *list) returns void
 	free(list->data);
 	free(list);
-}
+end
 
-void list_complete_free(void (*indivfree)(void*), list_t *list) {
+function list_complete_free(void (*indivfree)(void*), list_t *list) returns void
 	for (int i = 0; i < list->data_length; i++)
 		(*indivfree)(list->data[i]);
 	list_free(list);
-}
+end
 
 static void list_meminspector(size_t addNum, list_t *subject) {
 	if (subject->data_length + addNum >= subject->data_allocated_length) {
@@ -352,7 +366,7 @@ static void list_meminspector(size_t addNum, list_t *subject) {
 	}
 }
 
-string_t* string_init() {
+function string_init() returns string_t*
 	string_t *str = malloc(sizeof(string_t));
 
 	str->text = malloc(STRING_ALLOCATION_SIZE * sizeof(char));
@@ -362,7 +376,7 @@ string_t* string_init() {
 	str->text_allocated_length = STRING_ALLOCATION_SIZE;
 
 	return str;
-}
+end
 
 static string_t* custom_string_init(size_t allocationSize) {
 	string_t *str = malloc(sizeof(string_t));
@@ -376,47 +390,48 @@ static string_t* custom_string_init(size_t allocationSize) {
 	return str;
 }
 
-string_t* string_copyvalueof(char *src) {
+function string_copyvalueof(char *src) returns string_t*
 	int srcLength = strlen(src);
 
-	string_t *newStr = custom_string_init(srcLength + STRING_ALLOCATION_SIZE);
-	strncpy(newStr->text, src, srcLength);
-	newStr->text_length = srcLength;
+	string_t *dest = malloc(sizeof(string_t));
+	dest->text = strdup(src);
+	dest->text_length = srcLength;
+	dest->text_allocated_length = srcLength + 1;
 
-	return newStr;
-}
+	return dest;
+end
 
-string_t* string_copyvalueof_s(string_t *src) {
+function string_copyvalueof_s(string_t *src) returns string_t*
 	string_t *dest = malloc(sizeof(string_t));
 	dest->text = strdup(src->text);
 	dest->text_length = src->text_length;
 	dest->text_allocated_length = src->text_length + 1;
 
 	return dest;
-}
+end
 
-void string_append(string_t *dest, char *src) {
+function string_append(string_t *dest, char *src) returns void
 	int srcLength = strlen(src);
 	string_meminspection(srcLength, dest);
 
 	strncat(dest->text, src, srcLength);
 	dest->text_length += srcLength;
-}
+end
 
-void string_append_s(string_t *dest, string_t *src) {
+function string_append_s(string_t *dest, string_t *src) returns void
 	string_meminspection(src->text_length, dest);
 	strncat(dest->text, src->text, src->text_length);
 	dest->text_length += src->text_length;
-}
+end
 
-void string_appendchar(string_t *dest, char letter) {
+function string_appendchar(string_t *dest, char letter) returns void
 	string_meminspection(1, dest);
 	char text[2];
 	text[0] = letter;
 	text[1] = '\0';
 	strcat(dest->text, text);
 	dest->text_length++;
-}
+end
 
 string_t** string_split(char delimiter, string_t *src) {
 	// Safety
@@ -487,15 +502,21 @@ bool string_equalsignorecase_s(string_t *dest, string_t *src) {
 }
 
 bool string_startswith_s(string_t *src, string_t *search) {
-	return strcspn(src->text, search->text) != src->text_length;
+	if (search->text_length > src->text_length) {
+		return false;
+	}
+	for (int i = 0; i < search->text_length; i++)
+		if (src->text[i] != search->text[i])
+			return false;
+	return true;
 }
 
 bool string_startswith(string_t *src, char *search) {
 	int searchLength = strlen(search);
-	if (src->text_length != searchLength) {
+	if (searchLength > src->text_length) {
 		return false;
 	}
-	for (int i = 0; i < src->text_length; i++)
+	for (int i = 0; i < searchLength; i++)
 		if (src->text[i] != search[i])
 			return false;
 	return true;
