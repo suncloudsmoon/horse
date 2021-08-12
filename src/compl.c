@@ -24,13 +24,13 @@
  *      Author: suncloudsmoon
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <ctype.h>
-#include <string.h>
+#include "stdio.h"
+#include "stdlib.h"
+#include "stdbool.h"
+#include "errno.h"
+#include "stdarg.h"
+#include "ctype.h"
+#include "string.h"
 
 #define AVG_STRING_SIZE 5
 #define STRING_ALLOCATION_SIZE 5
@@ -136,6 +136,7 @@ const char *forIdentifier = "for";
 const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
+const char *importIdentifier = "import"; // import basics
 
   int  main()  {
 	char *inputFilename = "src/compl.hr";
@@ -290,6 +291,11 @@ if ( string_startswith(line, functionIdentifier)) {
 			string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
 			string_printf(parsed, "while (%s) {", condition->text);
 			com->scope++;
+} else if ( string_startswith(line, importIdentifier)) {
+			// import basics
+			parsed = string_init();
+			string_t *import = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
+			string_printf(parsed, "#include \"%s.h\"", import->text);
 } else {
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 }
