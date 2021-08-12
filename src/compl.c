@@ -123,16 +123,17 @@ static bool isSpecialCharacter(char alpha);
 void compile(compiler_t *com);
 int writeToFile(compiler_t *com);
 
+// Identifiers
 const char *functionIdentifier = "function";
 const char *endIdentifier = "end";
 
 const char *thenKeyword = "then";
-
 const char *ifIdentifier = "if"; // for now
 const char *elseIfIdentifier = "or if";
 const char *elseIdentifier = "or";
-
 const char *forIdentifier = "for";
+const char *whileIdentifier = "while";
+const char *classIdentifier = "class";
 
   int  main()  {
 	char *inputFilename = "src/compl.hr";
@@ -177,19 +178,20 @@ for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 
   void  readAllLines(compiler_t *com)  {
 	string_t *line = string_init();
-	while (!readLine(com->stream, line)) {
+while ( !readLine(com->stream, line) ) {
 		list_add(string_copyvalueof_s(line), com->allLines);
 		// Debug
 		// printf("[readAllLines] line from stream: %s\n", line->text);
 		string_reset(line);
-	}
+}
 	string_free(line);
 }
 
 static bool readLine(FILE *stream, string_t *line) {
 	char letter;
-	while ((letter = fgetc(stream)) != EOF && letter != '\n')
+while ( (letter = fgetc(stream)) != EOF && letter != '\n' ) {
 		string_appendchar(line, letter);
+}
 	return letter == EOF;
 }
 
@@ -236,8 +238,6 @@ for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
-		// printf("[compile] tokens: %s\n", firstToken->text);
-		// printf("[compile] cleanLine: %s\n", line->text);
 
 if ( string_startswith(line, functionIdentifier)) {
 			// function blah() returns void
@@ -256,15 +256,18 @@ if ( string_startswith(line, functionIdentifier)) {
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "if (%s) {", middle->text);
+			com->scope++;
 
 } else if ( string_startswith(line, elseIfIdentifier)) {
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "} else if (%s) {", middle->text);
+			com->scope++;
 		
 } else if ( string_startswith(line, elseIdentifier)) {
 			parsed = string_init();
 			string_append(parsed, "} else {");
+			com->scope++;
 
 } else if ( string_startswith(line, forIdentifier)) {
 			// for i to 5 do i++
@@ -273,6 +276,14 @@ if ( string_startswith(line, functionIdentifier)) {
 			string_t *condition = string_substring_s(string_indexof_s(line, "to") + strlen("to"), string_indexof_s(line, "do"), line);
 			string_t *increment = string_substring_s(string_indexof_s(line, "do") + strlen("do"), line->text_length, line);
 			string_printf(parsed, "for (int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
+			com->scope++;
+		
+} else if ( string_startswith(line, whileIdentifier)) {
+			// while blah do
+			parsed = string_init();
+			string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
+			string_printf(parsed, "while (%s) {", condition->text);
+			com->scope++;
 } else {
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 }
