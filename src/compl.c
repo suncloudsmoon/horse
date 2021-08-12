@@ -67,6 +67,7 @@ void string_printf(string_t *dest, char *format, ...);
 void string_append(string_t *dest, char *src);
 void string_append_s(string_t *dest, string_t *src);
 void string_appendchar(string_t *dest, char letter);
+int string_indexof_s(string_t *src, char *stopSign);
 string_t** string_split(char delimiter, string_t *src);
 bool string_equals(string_t *dest, char *src);
 bool string_equals_s(string_t *dest, string_t *src);
@@ -160,9 +161,9 @@ const char *forIdentifier = "for";
 
  void  compiler_free(compiler_t *com) {
 	list_complete_free(&string_free, com->allLines);
-	for (int i = 0; i < com->parsedLines->data_length; i++) {
+for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_complete_free(&string_free, com->parsedLines->data[i]);
-	}
+}
 	list_complete_free(&string_free, com->compiledLines);
 	free(com);
 }
@@ -194,10 +195,10 @@ static bool readLine(FILE *stream, string_t *line) {
 }
 
  void  parse(compiler_t *com) {
-	for (int i = 0; i < com->allLines->data_length; i++) {
+for (int  i  = 0;  i  <  com->allLines->data_length ;  i++) {
 		string_t *existingLine = (string_t*) com->allLines->data[i];
 		int firstLetter = strcspn(existingLine->text,
-				"abcdefghijklmnopqrstuvwxyz0123456789#{}");
+				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
 		string_t *initialClean = string_substring_s(firstLetter,
 				existingLine->text_length, existingLine);
 		list_add(initialClean, com->cleanedLines);		
@@ -205,14 +206,14 @@ static bool readLine(FILE *stream, string_t *line) {
 
 		// Debug
 		// printf("[parse] initialClean: %s\n", initialClean->text);
-	}
+}
 }
 
 static list_t* split(char delimiter, string_t *line) {
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
-	for (int i = 0; i < line->text_length; i++) {
+for (int  i  = 0;  i  <  line->text_length ;  i++) {
 		char alpha = line->text[i];
 if ( isSpecialCharacter(alpha) ) {
 			isSpecial = !isSpecial;
@@ -221,7 +222,7 @@ if ( isSpecialCharacter(alpha) ) {
 			string_reset(temp);
 }
 		string_appendchar(temp, alpha);
-	}
+}
 	list_add(temp, output);
 	return output;
 }
@@ -232,7 +233,7 @@ static bool isSpecialCharacter(char alpha) {
 
  void  compile(compiler_t *com) {
 	string_t *parsed;
-	for (int i = 0; i < com->parsedLines->data_length; i++) {
+for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
@@ -262,14 +263,18 @@ if ( string_startswith(line, functionIdentifier) ) {
 			parsed = string_init();
 			string_append(parsed, "} else {");
 
+} else if ( string_startswith(line, forIdentifier) ) {
+			// for i to 5 do i++
+			parsed = string_init();
+			string_t *i = string_substring_s(strlen(forIdentifier), string_indexof_s(line, "to"), line);
+			string_t *condition = string_substring_s(string_indexof_s(line, "to") + strlen("to"), string_indexof_s(line, "do"), line);
+			string_t *increment = string_substring_s(string_indexof_s(line, "do") + strlen("do"), line->text_length, line);
+			string_printf(parsed, "for (int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
 } else {
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 }
 		list_add(parsed, com->compiledLines);
-		// Debug
-		// printf("[compile] parsed: %s\n",
-		// 		((string_t*) com->compiledLines->data[i])->text);
-	}
+}
 }
 
 static string_t* compileFunctionHeader(list_t *tokens) {
@@ -282,10 +287,10 @@ static string_t* compileFunctionHeader(list_t *tokens) {
 
  int  writeToFile(compiler_t *com) {
 	FILE *output = com->outputFile;
-	for (int i = 0; i < com->compiledLines->data_length; i++) {
+for (int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
 		fprintf(output, "%s\n",
 				((string_t*) com->compiledLines->data[i])->text);		
-	}
+}
 	printf("[writeToFile] Successfully wrote to File!");
 	return fclose(output);
 }
@@ -316,9 +321,9 @@ static list_t* custom_list_init(size_t mallocSize) {
 
  void  list_remove(int index, list_t *list) {
 	// TODO: find a more efficient implementation of this
-	for (int i = index; i < list->data_length - 1; i++)
+for (int  i  = 0;  i  <  list->data_length - 1 ;  i++) {
 		list->data[i] = list->data[i + 1];
-
+}
 	list->data_length--;
 }
 
@@ -342,20 +347,20 @@ if ( index < 0 || index >= list->data_length ) {
 	return (*equalsComparator)(destComp, list->data[index]);
 }
 
-bool list_contains(void *destComp, bool (*equalsComparator)(void*, void*),
-		list_t *list) {
-	for (int i = 0; i < list->data_length; i++) {
+bool list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) {
+for (int  i  = 0;  i  <  list->data_length ;  i++) {
 if ( (*equalsComparator)(destComp, list->data[i]) ) {
 			return true;
 }
-	}
+}
 	return false;
 }
 
 void list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) {
 	fwrite(list->data_length, sizeof(int), 1, stream);
-	for (int i = 0; i < list->data_length; i++)
+for (int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indiv)(list->data[i], stream);
+}
 }
 
 list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
@@ -363,9 +368,9 @@ list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
 	fread(&arrayLength, sizeof(int), 1, stream);
 
 	list_t *list = custom_list_init(arrayLength);
-	for (int i = 0; i < arrayLength; i++)
+for (int  i  = 0;  i  <  arrayLength ;  i++) {
 		list_add((*indivreverse)(stream), list);
-
+}
 	return list;
 }
 
@@ -375,8 +380,9 @@ list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) {
 }
 
  void  list_complete_free(void (*indivfree)(void*), list_t *list) {
-	for (int i = 0; i < list->data_length; i++)
+for (int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indivfree)(list->data[i]);
+}
 	list_free(list);
 }
 
@@ -444,7 +450,7 @@ static string_t* custom_string_init(size_t allocationSize) {
 	va_list args;
 	va_start(args, format);
 	int argsLength = strlen(format);
-	for (int i = 0; i < argsLength; i++) {
+for (int  i  = 0;  i  <  argsLength ;  i++) {
 		char first = format[i];
 		char second = (i + 1 < argsLength) ? format[i+1] : NULL;
 		char *arg;
@@ -460,7 +466,7 @@ if ( first == '%' && second == 's' ) {
 		string_meminspection(argLength, dest);
 		strncat(dest->text, arg, argLength);
 		dest->text_length += argLength;
-	}
+}
 	va_end(args);
 }
 
@@ -487,6 +493,27 @@ if ( first == '%' && second == 's' ) {
 	dest->text_length++;
 }
 
+/*
+	returns -1 if no stopSign was found
+*/
+ int  string_indexof_s(string_t *src, char *stopSign) {
+	int stopSignLength = strlen(stopSign);
+	bool found = true;
+for (int  i  = 0;  i  <  src->text_length - stopSignLength ;  i++) {
+for (int  j  = 0;  j  <  stopSignLength ;  j++) {
+if ( src->text[i+j] != stopSign[j] ) {
+				found = false;
+				break;
+}
+}
+if ( found ) {
+			return i;
+}
+		found = true;
+}
+	return -1;
+}
+
 string_t** string_split(char delimiter, string_t *src) {
 	// Safety
 	// If the string is length 2 or less, then it is not possible to split the string
@@ -509,12 +536,13 @@ if ( splitIndex == src->text ) {
 		return NULL;
 }
 
-	for (int i = 0; i < splitIndex; i++) {
+for (int  i  = 0;  i  <  splitIndex ;  i++) {
 		string_appendchar(strList[0], src->text[i]);
-	}
-	for (int i = splitIndex + 1; i < src->text_length; i++) {
-		string_appendchar(strList[1], src->text[i]);
-	}
+}
+	// for splitIndex + 1 to src->text_length do i++
+for (int  i  = 0;  i  <  src->text_length ;  i++) {
+		string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
+}
 
 	return strList;
 }
@@ -540,11 +568,11 @@ if ( dest->text_length != src->text_length ) {
 if ( dest->text_length != strlen(src) ) {
 		return false;
 } else {
-		for (int i = 0; i < dest->text_length; i++) {
+for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 				return false;
 }
-		}		
+}
 		return true;
 }
 }
@@ -553,11 +581,11 @@ if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 if ( dest->text_length != src->text_length ) {
 		return false;
 } else {
-		for (int i = 0; i < dest->text_length; i++) {
+for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
 				return false;
 }
-		}
+}
 		return true;
 }
 }
@@ -566,11 +594,11 @@ if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
 if ( search->text_length > src->text_length ) {
 		return false;
 }
-	for (int i = 0; i < search->text_length; i++) {
+for (int  i  = 0;  i  <  search->text_length ;  i++) {
 if ( src->text[i] != search->text[i] ) {
 			return false;
 }
-	}
+}
 	return true;
 }
 
@@ -579,17 +607,13 @@ if ( src->text[i] != search->text[i] ) {
 if ( searchLength > src->text_length ) {
 		return false;
 }
-	for (int i = 0; i < searchLength; i++) {
+for (int  i  = 0;  i  <  searchLength ;  i++) {
 if ( src->text[i] != search[i] ) {
 			return false;
 }
-	}
+}
 	return true;
 }
-
-//char string_indexof_s(int index, string_t *src) {
-//
-//}
 
  string_t*  string_substring_s(int startIndex, int endIndex, string_t *src) {
 	size_t totalAppend = endIndex - startIndex;
@@ -609,8 +633,9 @@ if ( totalAppend < 0 || totalAppend > src->text_length ) {
 }
 
 void string_tolowercase_s(string_t *dest) {
-	for (int i = 0; i < dest->text_length; i++)
+for (int  i  = 0;  i  <  dest->text_length ;  i++) {
 		dest->text[i] = tolower(dest->text[i]);
+}
 }
 
  bool  string_serialize(string_t *src, FILE *stream) {
