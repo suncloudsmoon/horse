@@ -519,14 +519,14 @@ string_t** string_split(char delimiter, string_t *src) {
 	return strList;
 }
 
-bool string_equals(string_t *dest, char *src) {
+function string_equals(string_t *dest, char *src) returns bool
 	int srcLength = strlen(src);
 	if dest->text_length != srcLength then
 		return false;
 	or
 		return strncmp(dest->text, src, srcLength) == 0;
 	end	
-}
+end
 
 bool string_equals_s(string_t *dest, string_t *src) {
 	if dest->text_length != src->text_length then
@@ -536,7 +536,7 @@ bool string_equals_s(string_t *dest, string_t *src) {
 	end	
 }
 
-bool string_equalsignorecase(string_t *dest, char *src) {
+function string_equalsignorecase(string_t *dest, char *src) returns bool
 	if dest->text_length != strlen(src) then
 		return false;
 	or 
@@ -547,9 +547,9 @@ bool string_equalsignorecase(string_t *dest, char *src) {
 		}		
 		return true;
 	end
-}
+end
 
-bool string_equalsignorecase_s(string_t *dest, string_t *src) {
+function string_equalsignorecase_s(string_t *dest, string_t *src) returns bool
 	if dest->text_length != src->text_length then
 		return false;
 	or
@@ -560,9 +560,9 @@ bool string_equalsignorecase_s(string_t *dest, string_t *src) {
 		}
 		return true;
 	end
-}
+end
 
-bool string_startswith_s(string_t *src, string_t *search) {
+function string_startswith_s(string_t *src, string_t *search) returns bool
 	if search->text_length > src->text_length then
 		return false;
 	end
@@ -572,9 +572,9 @@ bool string_startswith_s(string_t *src, string_t *search) {
 		end	
 	}
 	return true;
-}
+end
 
-bool string_startswith(string_t *src, char *search) {
+function string_startswith(string_t *src, char *search) returns bool
 	int searchLength = strlen(search);
 	if searchLength > src->text_length then
 		return false;
@@ -585,13 +585,13 @@ bool string_startswith(string_t *src, char *search) {
 		end	
 	}
 	return true;
-}
+end
 
 //char string_indexof_s(int index, string_t *src) {
 //
 //}
 
-string_t* string_substring_s(int startIndex, int endIndex, string_t *src) {
+function string_substring_s(int startIndex, int endIndex, string_t *src) returns string_t*
 	size_t totalAppend = endIndex - startIndex;
 // Safety
 	if totalAppend < 0 || totalAppend > src->text_length then
@@ -606,19 +606,19 @@ string_t* string_substring_s(int startIndex, int endIndex, string_t *src) {
 	newStr->text_length += totalAppend + 1;
 
 	return newStr;
-}
+end
 
 void string_tolowercase_s(string_t *dest) {
 	for (int i = 0; i < dest->text_length; i++)
 		dest->text[i] = tolower(dest->text[i]);
 }
 
-bool string_serialize(string_t *src, FILE *stream) {
+function string_serialize(string_t *src, FILE *stream) returns bool
 	fwrite(&src->text_length, sizeof(int), 1, stream);
 	fwrite(src->text, sizeof(char), src->text_length, stream);
-}
+end
 
-string_t* string_deserialize(FILE *stream) {
+function string_deserialize(FILE *stream) returns string_t*
 	int textLength;
 	fread(&textLength, sizeof(int), 1, stream);
 
@@ -627,18 +627,18 @@ string_t* string_deserialize(FILE *stream) {
 	str->text_length = textLength;
 
 	return str;
-}
+end
 
-void string_reset(string_t *dest) {
+function string_reset(string_t *dest) returns void
 	dest->text[0] = '\0';
 	dest->text_length = 0;
-}
+end
 
-void string_free(void *dest) {
+function string_free(void *dest) returns void
 	free(((string_t*) dest)->text);
 // Free the structure itself
 	free(((string_t*) dest));
-}
+end
 
 // Memory related functions
 static void string_meminspection(size_t addNum, string_t *subject) {
@@ -657,7 +657,7 @@ static void string_meminspection(size_t addNum, string_t *subject) {
 }
 
 // TODO: add a predefined message for errors like index out of bounds exception, etc.
-void throw_exception(exception e, int lineNum, char *message, ...) {
+function throw_exception(exception e, int lineNum, char *message, ...) returns void
 	va_list args;
 	va_start(args, message);
 	char cMessage[AVG_STRING_SIZE];
@@ -684,4 +684,4 @@ void throw_exception(exception e, int lineNum, char *message, ...) {
 	default:
 		break;
 	}
-}
+end

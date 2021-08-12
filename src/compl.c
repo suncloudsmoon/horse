@@ -519,7 +519,7 @@ if ( splitIndex == src->text ) {
 	return strList;
 }
 
-bool string_equals(string_t *dest, char *src) {
+ bool  string_equals(string_t *dest, char *src) {
 	int srcLength = strlen(src);
 if ( dest->text_length != srcLength ) {
 		return false;
@@ -536,7 +536,7 @@ if ( dest->text_length != src->text_length ) {
 }
 }
 
-bool string_equalsignorecase(string_t *dest, char *src) {
+ bool  string_equalsignorecase(string_t *dest, char *src) {
 if ( dest->text_length != strlen(src) ) {
 		return false;
 } else {
@@ -549,7 +549,7 @@ if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 }
 }
 
-bool string_equalsignorecase_s(string_t *dest, string_t *src) {
+ bool  string_equalsignorecase_s(string_t *dest, string_t *src) {
 if ( dest->text_length != src->text_length ) {
 		return false;
 } else {
@@ -562,7 +562,7 @@ if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
 }
 }
 
-bool string_startswith_s(string_t *src, string_t *search) {
+ bool  string_startswith_s(string_t *src, string_t *search) {
 if ( search->text_length > src->text_length ) {
 		return false;
 }
@@ -574,7 +574,7 @@ if ( src->text[i] != search->text[i] ) {
 	return true;
 }
 
-bool string_startswith(string_t *src, char *search) {
+ bool  string_startswith(string_t *src, char *search) {
 	int searchLength = strlen(search);
 if ( searchLength > src->text_length ) {
 		return false;
@@ -591,7 +591,7 @@ if ( src->text[i] != search[i] ) {
 //
 //}
 
-string_t* string_substring_s(int startIndex, int endIndex, string_t *src) {
+ string_t*  string_substring_s(int startIndex, int endIndex, string_t *src) {
 	size_t totalAppend = endIndex - startIndex;
 // Safety
 if ( totalAppend < 0 || totalAppend > src->text_length ) {
@@ -613,12 +613,12 @@ void string_tolowercase_s(string_t *dest) {
 		dest->text[i] = tolower(dest->text[i]);
 }
 
-bool string_serialize(string_t *src, FILE *stream) {
+ bool  string_serialize(string_t *src, FILE *stream) {
 	fwrite(&src->text_length, sizeof(int), 1, stream);
 	fwrite(src->text, sizeof(char), src->text_length, stream);
 }
 
-string_t* string_deserialize(FILE *stream) {
+ string_t*  string_deserialize(FILE *stream) {
 	int textLength;
 	fread(&textLength, sizeof(int), 1, stream);
 
@@ -629,12 +629,12 @@ string_t* string_deserialize(FILE *stream) {
 	return str;
 }
 
-void string_reset(string_t *dest) {
+ void  string_reset(string_t *dest) {
 	dest->text[0] = '\0';
 	dest->text_length = 0;
 }
 
-void string_free(void *dest) {
+ void  string_free(void *dest) {
 	free(((string_t*) dest)->text);
 // Free the structure itself
 	free(((string_t*) dest));
@@ -657,7 +657,7 @@ if ( tempStr == NULL ) {
 }
 
 // TODO: add a predefined message for errors like index out of bounds exception, etc.
-void throw_exception(exception e, int lineNum, char *message, ...) {
+ void  throw_exception(exception e, int lineNum, char *message, ...) {
 	va_list args;
 	va_start(args, message);
 	char cMessage[AVG_STRING_SIZE];
