@@ -24,9 +24,7 @@
  *      Author: suncloudsmoon
  */
 
-import stdio
-import stdlib
-import stdbool
+import basics
 import errno
 import stdarg
 import ctype
@@ -104,9 +102,12 @@ typedef struct {
 	list_t *cleanedLines;
 	list_t *parsedLines; // List of parsed lines
 	list_t *compiledLines;
+
+	list_t *definitions;
 	list_t *classes; // list of class_t
 
-	FILE *stream;
+	string_t* directory;
+	FILE *inputFile;
 	FILE *outputFile;
 	
 	num scope
@@ -120,7 +121,7 @@ typedef struct {
 } class_t;
 
 // Compiler Functions
-compiler_t* compiler_init(FILE *inputFile, FILE *outputFile);
+compiler_t* compiler_init(string_t *directory, FILE *inputFile, FILE *outputFile);
 void compiler_free(compiler_t *com);
 void ignition(compiler_t *com);
 void readAllLines(compiler_t *com);
@@ -149,27 +150,35 @@ const char *importIdentifier = "import"; // import basics
 const char *numIdentifier = "num"; // num science = 5
 const char *numDataType = "long long int";
 
+const char *defFileName = "DEF";
+
 function main() returns int
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
+	// FORMAT: src/[name] excluding .h
+	string_t *directory = string_copyvalueof("src");
+	
 	FILE *input = fopen(inputFilename, "r");
 	FILE *output = fopen(outputFilename, "w");
 
-	compiler_t *com = compiler_init(input, output);
+	compiler_t *com = compiler_init(directory, input, output);
 	ignition(com);
 	compiler_free(com);
 	return 0;
 end
 
-function compiler_init(FILE *inputFile, FILE *outputFile) returns compiler_t*
+function compiler_init(string_t* directory, FILE *inputFile, FILE *outputFile) returns compiler_t*
 	compiler_t *com = malloc(sizeof(compiler_t));
 	com->allLines = list_init();
 	com->cleanedLines = list_init();
 	com->parsedLines = list_init();
 	com->compiledLines = list_init();
+
+	com->definitions = list_init();
 	com->classes = list_init();
 
-	com->stream = inputFile;
+	com->directory = directory;
+	com->inputFile = inputFile;
 	com->outputFile = outputFile;
 	com->currentClass = -1; // currently in no class
 	return com;
@@ -194,10 +203,8 @@ end
 
 function readAllLines(compiler_t *com) returns void
 	string_t *line = string_init();
-	while !readLine(com->stream, line) do
+	while !readLine(com->inputFile, line) do
 		list_add(string_copyvalueof_s(line), com->allLines);
-		// Debug
-		// printf("[readAllLines] line from stream: %s\n", line->text);
 		string_reset(line);
 	end
 	string_free(line);
@@ -254,6 +261,8 @@ function class_new(string_t *name) returns class_t*
 end
 
 function compile(compiler_t *com) returns void
+	// add definitions to file
+	list_add(string_copyvalueof("#define num long long int"), com->definitions);
 	string_t *parsed;
 	for i to (int)com->parsedLines->data_length do i++
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
@@ -324,8 +333,12 @@ function compile(compiler_t *com) returns void
 		or if string_startswith(line, importIdentifier) then
 			// import basics
 			parsed = string_init();
-			string_t *import = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
-			string_printf(parsed, "#include \"%s.h\"", import->text);
+			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
+			if string_startswith(importItem, "basics") then
+				string_printf(parsed, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n#include \"__%s__.h\"", defFileName);
+			or
+			string_printf(parsed, "#include \"%s.h\"", importItem->text);
+			end
 
 		or if string_equals(firstToken, numIdentifier) then
 			// num something = 5
@@ -345,11 +358,29 @@ end
 
 function writeToFile(compiler_t *com) returns int
 	FILE *output = com->outputFile;
-	for i to (int)com->compiledLines->data_length do i++
-		fprintf(output, "%s\n",
-				((string_t*) com->compiledLines->data[i])->text);		
+	string_t *fullDefPath = string_init();
+
+	// Double underscore is a used as a way to indicate that the file is Horse language specific	
+	string_printf(fullDefPath, "%s/__%s__.h", com->directory->text, defFileName);
+	FILE *definitions = fopen(fullDefPath->text, "w");
+	fprintf(definitions, "#ifndef %s_H_\n", defFileName);
+	fprintf(definitions, "#define %s_H_\n", defFileName);
+
+	// Writing defintions to a separate file and the user must include it in their project
+	for i to com->definitions->data_length do i++
+		fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
 	end
-	printf("[writeToFile] Successfully wrote to File!\n");
+	fprintf(definitions, "#endif\n");	
+	// Free memory
+	string_free(fullDefPath);
+	fclose(definitions);
+
+	for i to (int) com->compiledLines->data_length do i++
+		fprintf(output, "%s\n", ((string_t*) com->compiledLines->data[i])->text);		
+	end
+	// Debug
+	printf("[writeToFile] Successfully wrote to File!");
+
 	return fclose(output);
 end
 
@@ -486,7 +517,7 @@ private function custom_string_init(size_t allocationSize) returns string_t*
 end
 
 function string_copyvalueof(char *src) returns string_t*
-	int srcLength = strlen(src);
+	num srcLength = strlen(src);
 
 	string_t *dest = malloc(sizeof(string_t));
 	dest->text = strdup(src);
