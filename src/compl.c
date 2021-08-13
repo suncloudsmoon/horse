@@ -85,7 +85,7 @@ void throw_exception(exception e, int lineNum, char *message, ...);
 static string_t* custom_string_init(size_t allocationSize);
 static void string_meminspection(size_t addNum, string_t *subject);
 string_t* string_init();
-string_t* string_copyvalueof(char *text);
+string_t* string_copyvalueof(char *src);
 string_t* string_copyvalueof_s(string_t *src);
 void string_printf(string_t *dest, char *format, ...);
 void string_append(string_t *dest, char *src);
@@ -148,25 +148,34 @@ const char *forIdentifier = "for";
 const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
-const char *importIdentifier = "add"; // add basics to imports
+const char *importIdentifier = "import"; // add basics to imports
 
 const char *numIdentifier = "num"; // num science = 5
 const char *numDataType = "long long int";
 
 const char *defFileName = "DEF";
 
-  int  main()  {
-	char *inputFilename = "src/compl.hr";
-	char *outputFilename = "src/compl.c";
-	// FORMAT: src/[name] excluding .h
-	string_t *directory = string_copyvalueof("src");
+  int  main(int argc, char **argv)  {
+	string_t *inputFilename, *outputFilename, *directory;
+	// Arguments: [compiler executable] [directory] [directory/inputFile] [directory/outputFile]
+if ( (argc >= 4)) {
+		printf("[Debug] Successfully accessing the command line arguments!\n");
+		directory = string_copyvalueof(argv[1]);
+		inputFilename = string_copyvalueof(argv[2]);
+		outputFilename = string_copyvalueof(argv[3]);
+} else {
+		directory = string_copyvalueof("src");
+		inputFilename = string_copyvalueof("src/compl.hr");
+		outputFilename = string_copyvalueof("src/compl.c");
+}
 	
-	FILE *input = fopen(inputFilename, "r");
-	FILE *output = fopen(outputFilename, "w");
+	FILE *input = fopen(inputFilename->text, "r");
+	FILE *output = fopen(outputFilename->text, "w");
 
 	compiler_t *com = compiler_init(directory, input, output);
 	ignition(com);
 	compiler_free(com);
+
 	return 0;
 }
 
@@ -272,7 +281,7 @@ for (long long int  i  = 0;  i  <  (int)com->parsedLines->data_length ;  i++) {
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
 
-		printf("First token: %s\n", firstToken->text);
+		// printf("First token: %s\n", firstToken->text);
 if ( string_equals(firstToken, classIdentifier)) {
 			// class blah not class blah extends object
 			string_t *className = string_substring_s(strlen(classIdentifier) + 1, line->text_length, line);
@@ -336,11 +345,15 @@ if ( string_equals(firstToken, classIdentifier)) {
 } else if ( string_startswith(line, importIdentifier)) {
 			// add basics to imports
 			parsed = string_init();
-			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, string_indexof_s(line, "to") - 1, line);
+			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
+
 if ( string_startswith(importItem, "basics")) {
-				string_printf(parsed, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n#include \"__%s__.h\"", defFileName);
+				string_append(parsed, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n");
+				string_printf(parsed, "#include \"__%s__.h\"", defFileName);
 } else {
 				string_printf(parsed, "#include \"%s.h\"", importItem->text);
+
+			printf("Parsed Import Item: %s\n", parsed->text);	
 }
 
 } else if ( string_equals(firstToken, numIdentifier)) {
@@ -616,10 +629,6 @@ if ( src->text_length <= 2) {
 				src->text_length);
 }
 
-	string_t **strList = malloc(2 * sizeof(string_t));
-	strList[0] = custom_string_init(src->text_length / 2);
-	strList[1] = custom_string_init(src->text_length / 2);
-
 	char delimiterText[2];
 	delimiterText[0] = delimiter;
 	delimiterText[1] = '\0';
@@ -629,6 +638,10 @@ if ( src->text_length <= 2) {
 if ( splitIndex == (int)src->text_length) {
 		return NULL;
 }
+
+	string_t **strList = malloc(2 * sizeof(string_t));
+	strList[0] = custom_string_init(src->text_length / 2);
+	strList[1] = custom_string_init(src->text_length / 2);
 
 for (long long int  i  = 0;  i  <  splitIndex ;  i++) {
 		string_appendchar(strList[0], src->text[i]);
