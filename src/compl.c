@@ -104,12 +104,20 @@ typedef struct {
 	list_t *cleanedLines;
 	list_t *parsedLines; // List of parsed lines
 	list_t *compiledLines;
+	list_t *classes; // list of class_t
 
 	FILE *stream;
 	FILE *outputFile;
-
-	int scope;
+	
+long long int  scope;
+long long int  currentClass;
 } compiler_t;
+
+typedef struct {
+	string_t *name;
+	list_t *variables;
+	list_t *restOfLines;
+} class_t;
 
 // Compiler Functions
 compiler_t* compiler_init(FILE *inputFile, FILE *outputFile);
@@ -138,6 +146,9 @@ const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
 const char *importIdentifier = "import"; // import basics
 
+const char *numIdentifier = "num"; // num science = 5
+const char *numDataType = "long long int";
+
   int  main()  {
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
@@ -156,9 +167,11 @@ const char *importIdentifier = "import"; // import basics
 	com->cleanedLines = list_init();
 	com->parsedLines = list_init();
 	com->compiledLines = list_init();
+	com->classes = list_init();
 
 	com->stream = inputFile;
 	com->outputFile = outputFile;
+	com->currentClass = -1; // currently in no class
 	return com;
 }
 
@@ -232,6 +245,14 @@ static  bool  isSpecialCharacter(char alpha)  {
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
 }
 
+  class_t*  class_new(string_t *name)  {
+	class_t *newClass = malloc(sizeof(class_t));
+	newClass->name = string_copyvalueof_s(name);
+	newClass->variables = list_init();
+	newClass->restOfLines = list_init();
+	return newClass;
+}
+
   void  compile(compiler_t *com)  {
 	string_t *parsed;
 for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
@@ -239,7 +260,15 @@ for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
 
-if ( string_startswith(line, functionIdentifier)) {
+		printf("First token: %s\n", firstToken->text);
+if ( string_equals(firstToken, classIdentifier)) {
+			// class blah not class blah extends object
+			string_t *className = string_substring_s(strlen(classIdentifier) + 1, line->text_length, line);
+			list_add(class_new(className), com->classes);
+			com->currentClass++;
+			continue;
+
+} else if ( string_startswith(line, functionIdentifier)) {
 			// function blah() returns void
 			parsed = string_init();
 			string_t *function = string_substring_s(strlen(functionIdentifier), string_indexof_s(line, "returns"), line);
@@ -291,15 +320,26 @@ if ( string_startswith(line, functionIdentifier)) {
 			string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
 			string_printf(parsed, "while (%s) {", condition->text);
 			com->scope++;
+
 } else if ( string_startswith(line, importIdentifier)) {
 			// import basics
 			parsed = string_init();
 			string_t *import = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
 			string_printf(parsed, "#include \"%s.h\"", import->text);
+
+} else if ( string_equals(firstToken, numIdentifier)) {
+			// num something = 5
+			parsed = string_init();
+			string_t *variable = ((string_t *) tokens->data[1])->text;
+if ( string_indexof_s(line, "=") != -1) {
+				string_printf(parsed, "%s %s = %s;", numDataType, variable, ((string_t *) tokens->data[3])->text);
+} else {
+				string_printf(parsed, "%s %s;", numDataType, variable);
+}
 } else {
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 }
-		list_add(parsed, com->compiledLines);
+			list_add(parsed, com->compiledLines);
 }
 }
 

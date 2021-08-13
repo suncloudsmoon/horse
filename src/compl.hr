@@ -104,12 +104,20 @@ typedef struct {
 	list_t *cleanedLines;
 	list_t *parsedLines; // List of parsed lines
 	list_t *compiledLines;
+	list_t *classes; // list of class_t
 
 	FILE *stream;
 	FILE *outputFile;
-
-	int scope;
+	
+	num scope
+	num currentClass // index of the current class found in the list of classes
 } compiler_t;
+
+typedef struct {
+	string_t *name;
+	list_t *variables;
+	list_t *restOfLines;
+} class_t;
 
 // Compiler Functions
 compiler_t* compiler_init(FILE *inputFile, FILE *outputFile);
@@ -138,6 +146,9 @@ const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
 const char *importIdentifier = "import"; // import basics
 
+const char *numIdentifier = "num"; // num science = 5
+const char *numDataType = "long long int";
+
 function main() returns int
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
@@ -156,9 +167,11 @@ function compiler_init(FILE *inputFile, FILE *outputFile) returns compiler_t*
 	com->cleanedLines = list_init();
 	com->parsedLines = list_init();
 	com->compiledLines = list_init();
+	com->classes = list_init();
 
 	com->stream = inputFile;
 	com->outputFile = outputFile;
+	com->currentClass = -1; // currently in no class
 	return com;
 end
 
@@ -232,6 +245,14 @@ private function isSpecialCharacter(char alpha) returns bool
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
 end
 
+function class_new(string_t *name) returns class_t*
+	class_t *newClass = malloc(sizeof(class_t));
+	newClass->name = string_copyvalueof_s(name);
+	newClass->variables = list_init();
+	newClass->restOfLines = list_init();
+	return newClass;
+end
+
 function compile(compiler_t *com) returns void
 	string_t *parsed;
 	for i to com->parsedLines->data_length do i++
@@ -239,7 +260,15 @@ function compile(compiler_t *com) returns void
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
 
-		if string_startswith(line, functionIdentifier) then
+		printf("First token: %s\n", firstToken->text);
+		if string_equals(firstToken, classIdentifier) then
+			// class blah not class blah extends object
+			string_t *className = string_substring_s(strlen(classIdentifier) + 1, line->text_length, line);
+			list_add(class_new(className), com->classes);
+			com->currentClass++;
+			continue;
+
+		or if string_startswith(line, functionIdentifier) then
 			// function blah() returns void
 			parsed = string_init();
 			string_t *function = string_substring_s(strlen(functionIdentifier), string_indexof_s(line, "returns"), line);
@@ -282,7 +311,7 @@ function compile(compiler_t *com) returns void
 			string_t *i = string_substring_s(strlen(forIdentifier), string_indexof_s(line, "to"), line);
 			string_t *condition = string_substring_s(string_indexof_s(line, "to") + strlen("to"), string_indexof_s(line, "do"), line);
 			string_t *increment = string_substring_s(string_indexof_s(line, "do") + strlen("do"), line->text_length, line);
-			string_printf(parsed, "for (int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
+			string_printf(parsed, "for (long long int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
 			com->scope++;
 		
 		or if string_startswith(line, whileIdentifier) then
@@ -291,15 +320,26 @@ function compile(compiler_t *com) returns void
 			string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
 			string_printf(parsed, "while (%s) {", condition->text);
 			com->scope++;
+
 		or if string_startswith(line, importIdentifier) then
 			// import basics
 			parsed = string_init();
 			string_t *import = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
 			string_printf(parsed, "#include \"%s.h\"", import->text);
+
+		or if string_equals(firstToken, numIdentifier) then
+			// num something = 5
+			parsed = string_init();
+			string_t *variable = ((string_t *) tokens->data[1])->text;
+			if string_indexof_s(line, "=") != -1 then
+				string_printf(parsed, "%s %s = %s;", numDataType, variable, ((string_t *) tokens->data[3])->text);
+			or
+				string_printf(parsed, "%s %s;", numDataType, variable);
+			end
 		or
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 		end
-		list_add(parsed, com->compiledLines);
+			list_add(parsed, com->compiledLines);
 	end
 end	
 
