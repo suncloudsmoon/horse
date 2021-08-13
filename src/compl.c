@@ -24,9 +24,10 @@
  *      Author: suncloudsmoon
  */
 
-#include "stdio.h"
-#include "stdlib.h"
-#include "stdbool.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include "__DEF__.h"
 #include "errno.h"
 #include "stdarg.h"
 #include "ctype.h"
@@ -104,9 +105,12 @@ typedef struct {
 	list_t *cleanedLines;
 	list_t *parsedLines; // List of parsed lines
 	list_t *compiledLines;
+
+	list_t *definitions;
 	list_t *classes; // list of class_t
 
-	FILE *stream;
+	string_t* directory;
+	FILE *inputFile;
 	FILE *outputFile;
 	
 long long int  scope;
@@ -120,7 +124,7 @@ typedef struct {
 } class_t;
 
 // Compiler Functions
-compiler_t* compiler_init(FILE *inputFile, FILE *outputFile);
+compiler_t* compiler_init(string_t *directory, FILE *inputFile, FILE *outputFile);
 void compiler_free(compiler_t *com);
 void ignition(compiler_t *com);
 void readAllLines(compiler_t *com);
@@ -149,27 +153,35 @@ const char *importIdentifier = "import"; // import basics
 const char *numIdentifier = "num"; // num science = 5
 const char *numDataType = "long long int";
 
+const char *defFileName = "DEF";
+
   int  main()  {
 	char *inputFilename = "src/compl.hr";
 	char *outputFilename = "src/compl.c";
+	// FORMAT: src/[name] excluding .h
+	string_t *directory = string_copyvalueof("src");
+	
 	FILE *input = fopen(inputFilename, "r");
 	FILE *output = fopen(outputFilename, "w");
 
-	compiler_t *com = compiler_init(input, output);
+	compiler_t *com = compiler_init(directory, input, output);
 	ignition(com);
 	compiler_free(com);
 	return 0;
 }
 
-  compiler_t*  compiler_init(FILE *inputFile, FILE *outputFile)  {
+  compiler_t*  compiler_init(string_t* directory, FILE *inputFile, FILE *outputFile)  {
 	compiler_t *com = malloc(sizeof(compiler_t));
 	com->allLines = list_init();
 	com->cleanedLines = list_init();
 	com->parsedLines = list_init();
 	com->compiledLines = list_init();
+
+	com->definitions = list_init();
 	com->classes = list_init();
 
-	com->stream = inputFile;
+	com->directory = directory;
+	com->inputFile = inputFile;
 	com->outputFile = outputFile;
 	com->currentClass = -1; // currently in no class
 	return com;
@@ -177,7 +189,7 @@ const char *numDataType = "long long int";
 
   void  compiler_free(compiler_t *com)  {
 	list_complete_free(&string_free, com->allLines);
-for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
+for (long long int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_complete_free(&string_free, com->parsedLines->data[i]);
 }
 	list_complete_free(&string_free, com->compiledLines);
@@ -194,10 +206,8 @@ for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 
   void  readAllLines(compiler_t *com)  {
 	string_t *line = string_init();
-while ( !readLine(com->stream, line) ) {
+while ( !readLine(com->inputFile, line) ) {
 		list_add(string_copyvalueof_s(line), com->allLines);
-		// Debug
-		// printf("[readAllLines] line from stream: %s\n", line->text);
 		string_reset(line);
 }
 	string_free(line);
@@ -212,7 +222,7 @@ while ( (letter = fgetc(stream)) != EOF && letter != '\n' ) {
 }
 
   void  parse(compiler_t *com)  {
-for (int  i  = 0;  i  <  com->allLines->data_length ;  i++) {
+for (long long int  i  = 0;  i  <  com->allLines->data_length ;  i++) {
 		string_t *existingLine = (string_t*) com->allLines->data[i];
 		int firstLetter = strcspn(existingLine->text,
 				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
@@ -227,7 +237,7 @@ static  list_t*  split(char delimiter, string_t *line)  {
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
-for (int  i  = 0;  i  <  line->text_length ;  i++) {
+for (long long int  i  = 0;  i  <  line->text_length ;  i++) {
 		char alpha = line->text[i];
 if ( isSpecialCharacter(alpha)) {
 			isSpecial = !isSpecial;
@@ -254,8 +264,10 @@ static  bool  isSpecialCharacter(char alpha)  {
 }
 
   void  compile(compiler_t *com)  {
+	// add definitions to file
+	list_add(string_copyvalueof("#define num long long int"), com->definitions);
 	string_t *parsed;
-for (int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
+for (long long int  i  = 0;  i  <  com->parsedLines->data_length ;  i++) {
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
@@ -311,7 +323,7 @@ if ( string_equals(firstToken, classIdentifier)) {
 			string_t *i = string_substring_s(strlen(forIdentifier), string_indexof_s(line, "to"), line);
 			string_t *condition = string_substring_s(string_indexof_s(line, "to") + strlen("to"), string_indexof_s(line, "do"), line);
 			string_t *increment = string_substring_s(string_indexof_s(line, "do") + strlen("do"), line->text_length, line);
-			string_printf(parsed, "for (int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
+			string_printf(parsed, "for (long long int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
 			com->scope++;
 		
 } else if ( string_startswith(line, whileIdentifier)) {
@@ -324,8 +336,12 @@ if ( string_equals(firstToken, classIdentifier)) {
 } else if ( string_startswith(line, importIdentifier)) {
 			// import basics
 			parsed = string_init();
-			string_t *import = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
-			string_printf(parsed, "#include \"%s.h\"", import->text);
+			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
+if ( string_startswith(importItem, "basics")) {
+				string_printf(parsed, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n#include \"__%s__.h\"", defFileName);
+} else {
+			string_printf(parsed, "#include \"%s.h\"", importItem->text);
+}
 
 } else if ( string_equals(firstToken, numIdentifier)) {
 			// num something = 5
@@ -345,10 +361,27 @@ if ( string_indexof_s(line, "=") != -1) {
 
   int  writeToFile(compiler_t *com)  {
 	FILE *output = com->outputFile;
-for (int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
-		fprintf(output, "%s\n",
-				((string_t*) com->compiledLines->data[i])->text);		
+	string_t *fullDefPath = string_init();
+
+	// Double underscore is a used as a way to indicate that the file is Horse language specific	
+	string_printf(fullDefPath, "%s/__%s__.h", com->directory->text, defFileName);
+	FILE *definitions = fopen(fullDefPath->text, "w");
+	fprintf(definitions, "#ifndef %s_H_\n", defFileName);
+	fprintf(definitions, "#define %s_H_\n", defFileName);
+
+	// Writing defintions to a separate file and the user must include it in their project
+for (long long int  i  = 0;  i  <  com->definitions->data_length ;  i++) {
+		fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
 }
+	fprintf(definitions, "#endif\n");	
+	// Free memory
+	string_free(fullDefPath);
+	fclose(definitions);
+
+for (long long int  i  = 0;  i  <  com->compiledLines->data_length ;  i++) {
+		fprintf(output, "%s\n", ((string_t*) com->compiledLines->data[i])->text);		
+}
+	// Debug
 	printf("[writeToFile] Successfully wrote to File!");
 	return fclose(output);
 }
@@ -379,7 +412,7 @@ static  list_t*  custom_list_init(size_t mallocSize)  {
 
   void  list_remove(int index, list_t *list)  {
 	// TODO: find a more efficient implementation of this
-for (int  i  = 0;  i  <  list->data_length - 1 ;  i++) {
+for (long long int  i  = 0;  i  <  list->data_length - 1 ;  i++) {
 		list->data[i] = list->data[i + 1];
 }
 	list->data_length--;
@@ -405,7 +438,7 @@ if ( index < 0 || index >= list->data_length) {
 }
 
   bool  list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list)  {
-for (int  i  = 0;  i  <  list->data_length ;  i++) {
+for (long long int  i  = 0;  i  <  list->data_length ;  i++) {
 if ( (*equalsComparator)(destComp, list->data[i])) {
 			return true;
 }
@@ -415,7 +448,7 @@ if ( (*equalsComparator)(destComp, list->data[i])) {
 
   void  list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list)  {
 	fwrite(list->data_length, sizeof(int), 1, stream);
-for (int  i  = 0;  i  <  list->data_length ;  i++) {
+for (long long int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indiv)(list->data[i], stream);
 }
 }
@@ -425,7 +458,7 @@ for (int  i  = 0;  i  <  list->data_length ;  i++) {
 	fread(&arrayLength, sizeof(int), 1, stream);
 
 	list_t *list = custom_list_init(arrayLength);
-for (int  i  = 0;  i  <  arrayLength ;  i++) {
+for (long long int  i  = 0;  i  <  arrayLength ;  i++) {
 		list_add((*indivreverse)(stream), list);
 }
 	return list;
@@ -437,7 +470,7 @@ for (int  i  = 0;  i  <  arrayLength ;  i++) {
 }
 
   void  list_complete_free(void (*indivfree)(void*), list_t *list)  {
-for (int  i  = 0;  i  <  list->data_length ;  i++) {
+for (long long int  i  = 0;  i  <  list->data_length ;  i++) {
 		(*indivfree)(list->data[i]);
 }
 	list_free(list);
@@ -484,7 +517,7 @@ static  string_t*  custom_string_init(size_t allocationSize)  {
 }
 
   string_t*  string_copyvalueof(char *src)  {
-	int srcLength = strlen(src);
+long long int  srcLength =  strlen(src);;
 
 	string_t *dest = malloc(sizeof(string_t));
 	dest->text = strdup(src);
@@ -507,7 +540,7 @@ static  string_t*  custom_string_init(size_t allocationSize)  {
 	va_list args;
 	va_start(args, format);
 	int argsLength = strlen(format);
-for (int  i  = 0;  i  <  argsLength ;  i++) {
+for (long long int  i  = 0;  i  <  argsLength ;  i++) {
 		char first = format[i];
 		char second = (i + 1 < argsLength) ? format[i+1] : NULL;
 		char *arg;
@@ -556,8 +589,8 @@ if ( first == '%' && second == 's') {
   int  string_indexof_s(string_t *src, char *stopSign)  {
 	int stopSignLength = strlen(stopSign);
 	bool found = true;
-for (int  i  = 0;  i  <  src->text_length - stopSignLength ;  i++) {
-for (int  j  = 0;  j  <  stopSignLength ;  j++) {
+for (long long int  i  = 0;  i  <  src->text_length - stopSignLength ;  i++) {
+for (long long int  j  = 0;  j  <  stopSignLength ;  j++) {
 if ( src->text[i+j] != stopSign[j]) {
 				found = false;
 				break;
@@ -593,11 +626,11 @@ if ( splitIndex == src->text) {
 		return NULL;
 }
 
-for (int  i  = 0;  i  <  splitIndex ;  i++) {
+for (long long int  i  = 0;  i  <  splitIndex ;  i++) {
 		string_appendchar(strList[0], src->text[i]);
 }
 	// for splitIndex + 1 to src->text_length do i++
-for (int  i  = 0;  i  <  src->text_length ;  i++) {
+for (long long int  i  = 0;  i  <  src->text_length ;  i++) {
 		string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
 }
 
@@ -625,7 +658,7 @@ if ( dest->text_length != src->text_length) {
 if ( dest->text_length != strlen(src)) {
 		return false;
 } else {
-for (int  i  = 0;  i  <  dest->text_length ;  i++) {
+for (long long int  i  = 0;  i  <  dest->text_length ;  i++) {
 if ( tolower(dest->text[i]) != tolower(src[i])) {
 				return false;
 }
@@ -638,7 +671,7 @@ if ( tolower(dest->text[i]) != tolower(src[i])) {
 if ( dest->text_length != src->text_length) {
 		return false;
 } else {
-for (int  i  = 0;  i  <  dest->text_length ;  i++) {
+for (long long int  i  = 0;  i  <  dest->text_length ;  i++) {
 if ( (tolower(dest->text[i]) != tolower(src->text[i]))) {
 				return false;
 }
@@ -651,7 +684,7 @@ if ( (tolower(dest->text[i]) != tolower(src->text[i]))) {
 if ( search->text_length > src->text_length) {
 		return false;
 }
-for (int  i  = 0;  i  <  search->text_length ;  i++) {
+for (long long int  i  = 0;  i  <  search->text_length ;  i++) {
 if ( src->text[i] != search->text[i]) {
 			return false;
 }
@@ -664,7 +697,7 @@ if ( src->text[i] != search->text[i]) {
 if ( searchLength > src->text_length) {
 		return false;
 }
-for (int  i  = 0;  i  <  searchLength ;  i++) {
+for (long long int  i  = 0;  i  <  searchLength ;  i++) {
 if ( src->text[i] != search[i]) {
 			return false;
 }
@@ -690,7 +723,7 @@ if ( totalAppend < 0 || totalAppend > src->text_length) {
 }
 
   void  string_tolowercase_s(string_t *dest)  {
-for (int  i  = 0;  i  <  dest->text_length ;  i++) {
+for (long long int  i  = 0;  i  <  dest->text_length ;  i++) {
 		dest->text[i] = tolower(dest->text[i]);
 }
 }
