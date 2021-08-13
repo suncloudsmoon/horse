@@ -6,3 +6,8 @@ doc/
 .project
 a.out
 horse
+.clang-format
+compile_commands.json
+.cache/
+build/
+Makefile

@@ -30,7 +30,7 @@ import stdarg
 import ctype
 import string
 
-#define AVG_STRING_SIZE 5
+#define AVG_STRING_SIZE 32
 #define STRING_ALLOCATION_SIZE 5
 #define LIST_MANAGER_ALLOC_SIZE 10
 
@@ -67,11 +67,11 @@ void string_append_s(string_t *dest, string_t *src);
 void string_appendchar(string_t *dest, char letter);
 int string_indexof_s(string_t *src, char *stopSign);
 string_t** string_split(char delimiter, string_t *src);
-bool string_equals(string_t *dest, char *src);
+bool string_equals(string_t *dest, const char *src);
 bool string_equals_s(string_t *dest, string_t *src);
-bool string_equalsignorecase(string_t *dest, char *src);
+bool string_equalsignorecase(string_t *dest, const char *src);
 bool string_equalsignorecase_s(string_t *dest, string_t *src);
-bool string_startswith(string_t *src, char *search);
+bool string_startswith(string_t *src, const char *search);
 bool string_startswith_s(string_t *src, string_t *search);
 string_t* string_substring_s(int startIndex, int endIndex, string_t *src);
 void string_tolowercase_s(string_t *dest);
@@ -186,7 +186,7 @@ end
 
 function compiler_free(compiler_t *com) returns void
 	list_complete_free(&string_free, com->allLines);
-	for i to com->parsedLines->data_length do i++
+	for i to (int)com->parsedLines->data_length do i++
 		list_complete_free(&string_free, com->parsedLines->data[i]);
 	end
 	list_complete_free(&string_free, com->compiledLines);
@@ -219,7 +219,7 @@ private function readLine(FILE *stream, string_t *line) returns bool
 end
 
 function parse(compiler_t *com) returns void
-	for i to com->allLines->data_length do i++
+	for i to (int)com->allLines->data_length do i++
 		string_t *existingLine = (string_t*) com->allLines->data[i];
 		int firstLetter = strcspn(existingLine->text,
 				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
@@ -234,7 +234,7 @@ private function split(char delimiter, string_t *line) returns list_t*
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
-	for i to line->text_length do i++
+	for i to (int)line->text_length do i++
 		char alpha = line->text[i];
 		if isSpecialCharacter(alpha) then
 			isSpecial = !isSpecial;
@@ -264,7 +264,7 @@ function compile(compiler_t *com) returns void
 	// add definitions to file
 	list_add(string_copyvalueof("#define num long long int"), com->definitions);
 	string_t *parsed;
-	for i to com->parsedLines->data_length do i++
+	for i to (int)com->parsedLines->data_length do i++
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
@@ -343,7 +343,7 @@ function compile(compiler_t *com) returns void
 		or if string_equals(firstToken, numIdentifier) then
 			// num something = 5
 			parsed = string_init();
-			string_t *variable = ((string_t *) tokens->data[1])->text;
+			char* variable = ((string_t *) tokens->data[1])->text;
 			if string_indexof_s(line, "=") != -1 then
 				string_printf(parsed, "%s %s = %s;", numDataType, variable, ((string_t *) tokens->data[3])->text);
 			or
@@ -375,11 +375,12 @@ function writeToFile(compiler_t *com) returns int
 	string_free(fullDefPath);
 	fclose(definitions);
 
-	for i to com->compiledLines->data_length do i++
+	for i to (int) com->compiledLines->data_length do i++
 		fprintf(output, "%s\n", ((string_t*) com->compiledLines->data[i])->text);		
 	end
 	// Debug
 	printf("[writeToFile] Successfully wrote to File!");
+
 	return fclose(output);
 end
 
@@ -391,6 +392,8 @@ function list_init() returns list_t*
 
 	list->data_length = 0;
 	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
+
+	return list;
 end
 
 private function custom_list_init(size_t mallocSize) returns list_t*
@@ -399,6 +402,8 @@ private function custom_list_init(size_t mallocSize) returns list_t*
 
 	list->data_length = 0;
 	list->data_allocated_length = mallocSize;
+
+	return list;
 end
 
 function list_add(void *item, list_t *list) returns void
@@ -408,10 +413,8 @@ function list_add(void *item, list_t *list) returns void
 end
 
 function list_remove(int index, list_t *list) returns void
-	// TODO: find a more efficient implementation of this
-	for i to list->data_length - 1 do i++
-		list->data[i] = list->data[i + 1];
-	end
+	unsigned bytes = sizeof(void*) * (list->data_allocated_length - index - 1);
+	memmove(&list->data[index], &list->data[index+1], bytes);
 	list->data_length--;
 end
 
@@ -425,7 +428,7 @@ function list_clear(list_t *list) returns void
 end
 
 function list_equals(void *destComp, int index, bool (*equalsComparator)(void*, void*), list_t *list) returns bool
-	if index < 0 || index >= list->data_length then
+	if index < 0 || index >= (int)list->data_length then
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Tried to access a list in index %d that was out of bounds!",
 				index);
@@ -435,7 +438,7 @@ function list_equals(void *destComp, int index, bool (*equalsComparator)(void*, 
 end
 
 function list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) returns bool
-	for i to list->data_length do i++
+	for i to (int) list->data_length do i++
 		if (*equalsComparator)(destComp, list->data[i]) then
 			return true;
 		end	
@@ -444,8 +447,8 @@ function list_contains(void *destComp, bool (*equalsComparator)(void*, void*), l
 end
 
 function list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) returns void
-	fwrite(list->data_length, sizeof(int), 1, stream);
-	for i to list->data_length do i++
+	fwrite(&list->data_length, sizeof(list->data_length), 1, stream);
+	for i to (int)list->data_length do i++
 		(*indiv)(list->data[i], stream);
 	end	
 end
@@ -467,7 +470,7 @@ function list_free(list_t *list) returns void
 end
 
 function list_complete_free(void (*indivfree)(void*), list_t *list) returns void
-	for i to list->data_length do i++
+	for i to (int)list->data_length do i++
 		(*indivfree)(list->data[i]);
 	end	
 	list_free(list);
@@ -539,7 +542,7 @@ function string_printf(string_t *dest, char *format, ...) returns void
 	int argsLength = strlen(format);
 	for i to argsLength do i++
 		char first = format[i];
-		char second = (i + 1 < argsLength) ? format[i+1] : NULL;
+		char second = (i + 1 < argsLength) ? format[i+1] : '\0';
 		char *arg;
 		if first == '%' && second == 's' then
 			arg = va_arg(args, char*);
@@ -586,7 +589,7 @@ end
 function string_indexof_s(string_t *src, char *stopSign) returns int
 	int stopSignLength = strlen(stopSign);
 	bool found = true;
-	for i to src->text_length - stopSignLength do i++
+	for i to (int) src->text_length - stopSignLength do i++
 		for j to stopSignLength do j++
 			if src->text[i+j] != stopSign[j] then
 				found = false;
@@ -619,7 +622,8 @@ function string_split(char delimiter, string_t *src) returns string_t**
 	delimiterText[1] = '\0';
 	int splitIndex = strcspn(src->text, delimiterText);
 
-	if splitIndex == src->text then
+	// Was splitIndex == src->text
+	if splitIndex == (int)src->text_length then
 		return NULL;
 	end
 
@@ -627,15 +631,15 @@ function string_split(char delimiter, string_t *src) returns string_t**
 		string_appendchar(strList[0], src->text[i]);
 	end
 	// for splitIndex + 1 to src->text_length do i++
-	for i to src->text_length do i++
+	for i to (int) src->text_length do i++
 		string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
 	end
 
 	return strList;
 end
 
-function string_equals(string_t *dest, char *src) returns bool
-	int srcLength = strlen(src);
+function string_equals(string_t *dest, const char *src) returns bool
+	unsigned srcLength = strlen(src);
 	if dest->text_length != srcLength then
 		return false;
 	or
@@ -647,15 +651,15 @@ function string_equals_s(string_t *dest, string_t *src) returns bool
 	if dest->text_length != src->text_length then
 		return false;
 	or
-		return strncmp(dest->text, src, src->text_length) == 0;
+		return strncmp(dest->text, src->text, src->text_length) == 0;
 	end	
 end
 
-function string_equalsignorecase(string_t *dest, char *src) returns bool
+function string_equalsignorecase(string_t *dest, const char *src) returns bool
 	if dest->text_length != strlen(src) then
 		return false;
 	or 
-		for i to dest->text_length do i++
+		for i to (int)dest->text_length do i++
 			if tolower(dest->text[i]) != tolower(src[i]) then
 				return false;
 			end	
@@ -668,7 +672,7 @@ function string_equalsignorecase_s(string_t *dest, string_t *src) returns bool
 	if dest->text_length != src->text_length then
 		return false;
 	or
-		for i to dest->text_length do i++
+		for i to (int)dest->text_length do i++
 			if (tolower(dest->text[i]) != tolower(src->text[i])) then
 				return false;
 			end	
@@ -681,7 +685,7 @@ function string_startswith_s(string_t *src, string_t *search) returns bool
 	if search->text_length > src->text_length then
 		return false;
 	end
-	for i to search->text_length do i++
+	for i to (int)search->text_length do i++
 		if src->text[i] != search->text[i] then
 			return false;
 		end	
@@ -689,8 +693,8 @@ function string_startswith_s(string_t *src, string_t *search) returns bool
 	return true;
 end
 
-function string_startswith(string_t *src, char *search) returns bool
-	int searchLength = strlen(search);
+function string_startswith(string_t *src, const char *search) returns bool
+	unsigned searchLength = strlen(search);
 	if searchLength > src->text_length then
 		return false;
 	end
@@ -705,7 +709,7 @@ end
 function string_substring_s(int startIndex, int endIndex, string_t *src) returns string_t*
 	size_t totalAppend = endIndex - startIndex;
 // Safety
-	if totalAppend < 0 || totalAppend > src->text_length then
+	if totalAppend > src->text_length then
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Unable to substring a string starting from index %d and ending %d",
 				startIndex, endIndex);
@@ -720,7 +724,7 @@ function string_substring_s(int startIndex, int endIndex, string_t *src) returns
 end
 
 function string_tolowercase_s(string_t *dest) returns void
-	for i to dest->text_length do i++
+	for i to (int)dest->text_length do i++
 		dest->text[i] = tolower(dest->text[i]);
 	end	
 end
@@ -728,6 +732,7 @@ end
 function string_serialize(string_t *src, FILE *stream) returns bool
 	fwrite(&src->text_length, sizeof(int), 1, stream);
 	fwrite(src->text, sizeof(char), src->text_length, stream);
+	return true;
 end
 
 function string_deserialize(FILE *stream) returns string_t*
