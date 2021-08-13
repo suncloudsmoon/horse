@@ -24,11 +24,11 @@
  *      Author: suncloudsmoon
  */
 
-import basics
-import errno
-import stdarg
-import ctype
-import string
+add basics to imports
+add errno to imports
+add stdarg to imports
+add ctype to imports
+add string to imports
 
 #define AVG_STRING_SIZE 32
 #define STRING_ALLOCATION_SIZE 5
@@ -51,6 +51,29 @@ typedef struct {
 	size_t data_length;
 	size_t data_allocated_length;
 } list_t;
+
+typedef struct {
+	list_t *allLines; // List of all lines
+	list_t *cleanedLines;
+	list_t *parsedLines; // List of parsed lines
+	list_t *compiledLines;
+
+	list_t *definitions;
+	list_t *classes; // list of class_t
+
+	string_t* directory;
+	FILE *inputFile;
+	FILE *outputFile;
+	
+	num scope
+	num currentClass // index of the current class found in the list of classes
+} compiler_t;
+
+typedef struct {
+	string_t *name;
+	list_t *variables;
+	list_t *restOfLines;
+} class_t;
 
 // Exception Stuff
 void throw_exception(exception e, int lineNum, char *message, ...);
@@ -97,29 +120,6 @@ list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream);
 void list_free(list_t *list);
 void list_complete_free(void (*indivfree)(void*), list_t *list);
 
-typedef struct {
-	list_t *allLines; // List of all lines
-	list_t *cleanedLines;
-	list_t *parsedLines; // List of parsed lines
-	list_t *compiledLines;
-
-	list_t *definitions;
-	list_t *classes; // list of class_t
-
-	string_t* directory;
-	FILE *inputFile;
-	FILE *outputFile;
-	
-	num scope
-	num currentClass // index of the current class found in the list of classes
-} compiler_t;
-
-typedef struct {
-	string_t *name;
-	list_t *variables;
-	list_t *restOfLines;
-} class_t;
-
 // Compiler Functions
 compiler_t* compiler_init(string_t *directory, FILE *inputFile, FILE *outputFile);
 void compiler_free(compiler_t *com);
@@ -132,7 +132,7 @@ static bool isSpecialCharacter(char alpha);
 void compile(compiler_t *com);
 int writeToFile(compiler_t *com);
 
-// Identifiers
+// Horse Identifiers
 const char *functionIdentifier = "function";
 const char *privateFunctionIdentifier = "private function";
 const char *endIdentifier = "end";
@@ -145,7 +145,7 @@ const char *forIdentifier = "for";
 const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
-const char *importIdentifier = "import"; // import basics
+const char *importIdentifier = "add"; // add basics to imports
 
 const char *numIdentifier = "num"; // num science = 5
 const char *numDataType = "long long int";
@@ -331,13 +331,13 @@ function compile(compiler_t *com) returns void
 			com->scope++;
 
 		or if string_startswith(line, importIdentifier) then
-			// import basics
+			// add basics to imports
 			parsed = string_init();
-			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
+			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, string_indexof_s(line, "to") - 1, line);
 			if string_startswith(importItem, "basics") then
 				string_printf(parsed, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n#include \"__%s__.h\"", defFileName);
 			or
-			string_printf(parsed, "#include \"%s.h\"", importItem->text);
+				string_printf(parsed, "#include \"%s.h\"", importItem->text);
 			end
 
 		or if string_equals(firstToken, numIdentifier) then
@@ -352,7 +352,7 @@ function compile(compiler_t *com) returns void
 		or
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 		end
-			list_add(parsed, com->compiledLines);
+		list_add(parsed, com->compiledLines);
 	end
 end	
 
