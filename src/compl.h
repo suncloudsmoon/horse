@@ -54,6 +54,10 @@ long long int currentClass;
 typedef struct {
 	string_t *name;
 
+	list_t *sourceDefinitions; // like #define f compl_f
+
+	list_t *classTypedef;
+
 	string_t *includeStatements;
 	list_t *definitions; // and definitions
 	list_t *prototypes; // function prototypes
@@ -79,6 +83,9 @@ const char *numIdentifier = "num"; // num science = 5
 const char *numDataType = "long long int";
 
 const char *defFileName = "DEF";
+
+
+
 
 
 
@@ -138,56 +145,59 @@ const char *defFileName = "DEF";
 // Memory related functions
 
 // TODO: add a predefined message for errors like index out of bounds exception, etc.
-  int  main(int argc, char **argv) ;
-  void  startCompiler(string_t *directory, string_t *inputFilename) ;
-  compiler_t*  compiler_init(string_t* directory, FILE *inputFile) ;
-  void  compiler_free(compiler_t *com) ;
-  void  ignition(compiler_t *com) ;
-  void  readAllLines(compiler_t *com) ;
-static  bool  readLine(FILE *stream, string_t *line) ;
-  void  parse(compiler_t *com) ;
-static  list_t*  split(char delimiter, string_t *line) ;
-static  bool  isSpecialCharacter(char alpha) ;
-  class_t*  class_new(string_t *name, string_t *includeStatements) ;
-  void  compile(compiler_t *com) ;
-static  void  addFunctionHeader(string_t *functionBody, compiler_t *com) ;
-static  void  addDefinitionToHeader(string_t *definition, compiler_t *com) ;
-  int  writeToFile(compiler_t *com) ;
-  list_t*  list_init() ;
-static  list_t*  custom_list_init(size_t mallocSize) ;
-  void  list_add(void *item, list_t *list) ;
-  void  list_remove(int index, list_t *list) ;
-  void  list_complete_remove(void (*indivfree)(void*), int index, list_t *list) ;
-  void  list_clear(list_t *list) ;
-  bool  list_equals(void *destComp, int index, bool (*equalsComparator)(void*, void*), list_t *list) ;
-  bool  list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) ;
-  void  list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) ;
-  list_t*  list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) ;
-  void  list_free(list_t *list) ;
-  void  list_complete_free(void (*indivfree)(void*), list_t *list) ;
-static  void  list_meminspector(size_t addNum, list_t *subject) ;
-  string_t*  string_init() ;
-static  string_t*  custom_string_init(size_t allocationSize) ;
-  string_t*  string_copyvalueof(char *src) ;
-  string_t*  string_copyvalueof_s(string_t *src) ;
-  void  string_printf(string_t *dest, char *format, ...) ;
-  void  string_append(string_t *dest, char *src) ;
-  void  string_append_s(string_t *dest, string_t *src) ;
-  void  string_appendchar(string_t *dest, char letter) ;
-  int  string_indexof_s(string_t *src, char *stopSign) ;
-  string_t**  string_split(char delimiter, string_t *src) ;
-  bool  string_equals(string_t *dest, const char *src) ;
-  bool  string_equals_s(string_t *dest, string_t *src) ;
-  bool  string_equalsignorecase(string_t *dest, const char *src) ;
-  bool  string_equalsignorecase_s(string_t *dest, string_t *src) ;
-  bool  string_startswith_s(string_t *src, string_t *search) ;
-  bool  string_startswith(string_t *src, const char *search) ;
-  string_t*  string_substring_s(int startIndex, int endIndex, string_t *src) ;
-  void  string_tolowercase_s(string_t *dest) ;
-  bool  string_serialize(string_t *src, FILE *stream) ;
-  string_t*  string_deserialize(FILE *stream) ;
-  void  string_reset(string_t *dest) ;
-  void  string_free(void *dest) ;
-static  void  string_meminspection(size_t addNum, string_t *subject) ;
-  void  throw_exception(exception e, int lineNum, char *message, ...) ;
+ int main(int argc, char **argv) ;
+ void compl_startCompiler(string_t *directory, string_t *inputFilename) ;
+ compiler_t* compl_compiler_init(string_t* directory, FILE *inputFile) ;
+ void compl_compiler_free(compiler_t *com) ;
+ void compl_ignition(compiler_t *com) ;
+ void compl_readAllLines(compiler_t *com) ;
+static  bool compl_readLine(FILE *stream, string_t *line) ;
+ void compl_parse(compiler_t *com) ;
+static  list_t* compl_split(char delimiter, string_t *line) ;
+static  bool compl_isSpecialCharacter(char alpha) ;
+ class_t* compl_class_new(string_t *name, string_t *includeStatements) ;
+ void compl_compile(compiler_t *com) ;
+static  void compl_addFunctionHeader(string_t *functionBody, compiler_t *com) ;
+static  void compl_addSourceFunctionDefinition(string_t *functionName, compiler_t *com) ;
+static  void compl_addDefinitionToHeader(string_t *definition, compiler_t *com) ;
+ int compl_writeToFile(compiler_t *com) ;
+static  void compl_writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass) ;
+static  void compl_writeToSourceFile(string_t *fullSourcePath, class_t *currentClass) ;
+ list_t* compl_list_init() ;
+static  list_t* compl_custom_list_init(size_t mallocSize) ;
+ void compl_list_add(void *item, list_t *list) ;
+ void compl_list_remove(int index, list_t *list) ;
+ void compl_list_complete_remove(void (*indivfree)(void*), int index, list_t *list) ;
+ void compl_list_clear(list_t *list) ;
+ bool compl_list_equals(void *destComp, int index, bool (*equalsComparator)(void*, void*), list_t *list) ;
+ bool compl_list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list) ;
+ void compl_list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list) ;
+ list_t* compl_list_deserialize(void* (*indivreverse)(FILE*), FILE *stream) ;
+ void compl_list_free(list_t *list) ;
+ void compl_list_complete_free(void (*indivfree)(void*), list_t *list) ;
+static  void compl_list_meminspector(size_t addNum, list_t *subject) ;
+ string_t* compl_string_init() ;
+static  string_t* compl_custom_string_init(size_t allocationSize) ;
+ string_t* compl_string_copyvalueof(char *src) ;
+ string_t* compl_string_copyvalueof_s(string_t *src) ;
+ void compl_string_printf(string_t *dest, char *format, ...) ;
+ void compl_string_append(string_t *dest, char *src) ;
+ void compl_string_append_s(string_t *dest, string_t *src) ;
+ void compl_string_appendchar(string_t *dest, char letter) ;
+ int compl_string_indexof_s(string_t *src, char *stopSign) ;
+ string_t** compl_string_split(char delimiter, string_t *src) ;
+ bool compl_string_equals(string_t *dest, const char *src) ;
+ bool compl_string_equals_s(string_t *dest, string_t *src) ;
+ bool compl_string_equalsignorecase(string_t *dest, const char *src) ;
+ bool compl_string_equalsignorecase_s(string_t *dest, string_t *src) ;
+ bool compl_string_startswith_s(string_t *src, string_t *search) ;
+ bool compl_string_startswith(string_t *src, const char *search) ;
+ string_t* compl_string_substring_s(int startIndex, int endIndex, string_t *src) ;
+ void compl_string_tolowercase_s(string_t *dest) ;
+ bool compl_string_serialize(string_t *src, FILE *stream) ;
+ string_t* compl_string_deserialize(FILE *stream) ;
+ void compl_string_reset(string_t *dest) ;
+ void compl_string_free(void *dest) ;
+static  void compl_string_meminspection(size_t addNum, string_t *subject) ;
+ void compl_throw_exception(exception e, int lineNum, char *message, ...) ;
 #endif

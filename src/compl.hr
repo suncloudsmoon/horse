@@ -74,6 +74,10 @@ typedef struct {
 typedef struct {
 	string_t *name;
 
+	list_t *sourceDefinitions; // like #define f compl_f
+
+	list_t *classTypedef;
+
 	string_t *includeStatements;
 	list_t *definitions; // and definitions
 	list_t *prototypes; // function prototypes
@@ -103,7 +107,7 @@ const char *defFileName = "DEF";
 function main(int argc, char **argv) returns int
 	string_t *inputFilename, *directory;
 	// Arguments: [compiler executable] [directory] [directory/inputFile] [directory/outputFile]
-	if (argc >= 4) then
+	if argc >= 4 then
 		printf("[Debug] Successfully accessing the command line arguments!\n");
 		int i = 1;
 		directory = string_copyvalueof(argv[i]);
@@ -227,6 +231,8 @@ function class_new(string_t *name, string_t *includeStatements) returns class_t*
 	class_t *newClass = malloc(sizeof(class_t));
 	newClass->name = name;
 
+	newClass->sourceDefinitions = list_init();
+
 	newClass->includeStatements = includeStatements;
 	newClass->definitions = list_init();
 	newClass->prototypes = list_init();
@@ -239,7 +245,7 @@ function compile(compiler_t *com) returns void
 	// add definitions to file
 	list_add(string_copyvalueof("#define num long long int"), com->definitions);
 	string_t *parsed;
-	for i to (int)com->parsedLines->data_length do i++
+	for i to (int) com->parsedLines->data_length do i++
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
@@ -255,25 +261,51 @@ function compile(compiler_t *com) returns void
 
 		or if string_startswith(line, functionIdentifier) then
 			// function blah() returns void
+			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
 			parsed = string_init();
-			string_t *function = string_substring_s(strlen(functionIdentifier), string_indexof_s(line, "returns"), line);
+			string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(line, "("), line);
+			string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(line, "returns"), line);
 			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
-			string_printf(parsed, " %s %s", returnType->text, function->text);
-			addFunctionHeader(parsed, com);
-			string_append(parsed, " {");
+			
+			bool isMain = string_equals(functionName, "main");
+			printf("[compile] functionName:%s %d %d\n", functionName->text, functionName->text_length, strlen("main"));
 
+			if string_equals(functionName, "main") then
+				string_printf(parsed, "%s %s", returnType->text, functionBody->text);
+			or
+				string_printf(parsed, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
+				addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
+			end		
+
+			addFunctionHeader(parsed, com);
+
+			string_append(parsed, " {");
 			com->scope++;
+
+			// Free resources
+			string_free(functionName);
+			string_free(functionBody);
+			string_free(returnType);
 
 		or if string_startswith(line, privateFunctionIdentifier) then
 			// private function blah() returns void
+			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
 			parsed = string_init();
-			string_t *function = string_substring_s(strlen(privateFunctionIdentifier), string_indexof_s(line, "returns"), line);
+			string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(line, "("), line);
+			string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(line, "returns"), line);
 			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
-			string_printf(parsed, "static %s %s", returnType->text, function->text);
+			string_printf(parsed, "static %s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
+			
+			addSourceFunctionDefinition(functionName, com);
 			addFunctionHeader(parsed, com);
-			string_append(parsed, " {");
 
+			string_append(parsed, " {");
 			com->scope++;
+
+			// Free resources
+			string_free(functionName);
+			string_free(functionBody);
+			string_free(returnType);
 
 		or if string_startswith(line, endIdentifier) then
 			parsed = string_copyvalueof("}");
@@ -285,13 +317,13 @@ function compile(compiler_t *com) returns void
 		or if string_startswith(line, ifIdentifier) then
 			// if blah then
 			parsed = string_init();
-			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
+			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword), line);
 			string_printf(parsed, "if (%s) {", middle->text);
 			com->scope++;
 
 		or if string_startswith(line, elseIfIdentifier) then
 			parsed = string_init();
-			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
+			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword), line);
 			string_printf(parsed, "} else if (%s) {", middle->text);
 		
 		or if string_startswith(line, elseIdentifier) then
@@ -363,6 +395,13 @@ private function addFunctionHeader(string_t *functionBody, compiler_t *com) retu
 	list_add(funct, ((class_t*)com->classes->data[com->currentClass])->prototypes);
 end
 
+private function addSourceFunctionDefinition(string_t *functionName, compiler_t *com) returns void
+	class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
+	string_t *def = string_init();
+	string_printf(def, "#define %s %s_%s", functionName->text, currentClass->name->text, functionName->text);
+	list_add(def, currentClass->sourceDefinitions);
+end
+
 private function addDefinitionToHeader(string_t *definition, compiler_t *com) returns void
 	list_add(definition, ((class_t*) com->classes->data[com->currentClass])->definitions);
 end
@@ -392,38 +431,52 @@ function writeToFile(compiler_t *com) returns int
 		string_printf(fullHeaderPath, "src/%s.h", currentClass->name->text);
 		string_printf(fullSourcePath, "src/%s.c", currentClass->name->text);
 
-		// Writing header to file
-		FILE *headerFile = fopen(fullHeaderPath->text, "w");
-		fprintf(headerFile, "// This file was automatically generated by the horse compiler\n");
-		fprintf(headerFile, "#ifndef %s_H_\n", currentClass->name->text);
-		fprintf(headerFile, "#define %s_H_\n", currentClass->name->text);
-		fprintf(headerFile, "#include \"__%s__.h\"\n", defFileName); // core definitions of Horse
-
-		// Add includes to file
-		fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
-		for j to currentClass->definitions->data_length do j++
-			fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
-		end	
-		for j to currentClass->prototypes->data_length do j++
-			fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
-		end
-		fprintf(headerFile, "#endif\n");
-		fclose(headerFile);
-		
-		// Writing source to file
-		FILE *sourceFile = fopen(fullSourcePath->text, "w");
-		fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
-		fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
-		for j to currentClass->restOfLines->data_length do j++
-			fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
-			// Test	
-			fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
-		end
-		fclose(sourceFile);
+		writeToHeaderFile(fullHeaderPath, currentClass);
+		writeToSourceFile(fullSourcePath, currentClass);
 		
 		string_free(fullHeaderPath);
 		string_free(fullSourcePath);
 	end	
+end
+
+private function writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass) returns void
+	// Writing header to file
+	FILE *headerFile = fopen(fullHeaderPath->text, "w");
+	fprintf(headerFile, "// This file was automatically generated by the horse compiler\n");
+	fprintf(headerFile, "#ifndef %s_H_\n", currentClass->name->text);
+	fprintf(headerFile, "#define %s_H_\n", currentClass->name->text);
+	fprintf(headerFile, "#include \"__%s__.h\"\n", defFileName); // core definitions of Horse
+	
+	// Add header stuff to file
+	fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
+	for j to currentClass->definitions->data_length do j++
+		fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
+	end	
+	for j to currentClass->prototypes->data_length do j++
+		fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
+	end
+	fprintf(headerFile, "#endif\n");
+	fclose(headerFile);
+end
+
+private function writeToSourceFile(string_t *fullSourcePath, class_t *currentClass) returns void
+	// Writing source to file
+	FILE *sourceFile = fopen(fullSourcePath->text, "w");
+	fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
+	fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
+
+	// Add #defines function stuff to source file
+	for j to currentClass->sourceDefinitions->data_length do j++
+		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j])->text);
+	end
+	
+	// Add the lump sum of all functions to the source file
+	for j to currentClass->restOfLines->data_length do j++
+		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
+		// Test	
+		fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
+	end
+	fclose(sourceFile);
 end
 
 ////// LIBRARIES //////
@@ -631,7 +684,7 @@ end
 function string_indexof_s(string_t *src, char *stopSign) returns int
 	int stopSignLength = strlen(stopSign);
 	bool found = true;
-	for i to (int) src->text_length - stopSignLength do i++
+	for i to (int) src->text_length - stopSignLength + 1 do i++
 		for j to stopSignLength do j++
 			if src->text[i+j] != stopSign[j] then
 				found = false;
@@ -749,18 +802,16 @@ function string_startswith(string_t *src, const char *search) returns bool
 end
 
 function string_substring_s(int startIndex, int endIndex, string_t *src) returns string_t*
-	size_t totalAppend = endIndex - startIndex;
-// Safety
+	size_t totalAppend = endIndex - startIndex; // 1 - 0
 	if totalAppend > src->text_length then
 		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
 				"Unable to substring a string starting from index %d and ending %d",
 				startIndex, endIndex);
 	end
-// TODO: fix this
 	string_t *newStr = custom_string_init(totalAppend + 2);
 	strncpy(newStr->text, src->text + startIndex, totalAppend);
 	newStr->text[totalAppend] = '\0';
-	newStr->text_length += totalAppend + 1;
+	newStr->text_length = totalAppend;
 
 	return newStr;
 end
