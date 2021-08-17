@@ -30,6 +30,8 @@ import stdarg
 import ctype
 import string
 
+class compl
+
 #define AVG_STRING_SIZE 32
 #define STRING_ALLOCATION_SIZE 5
 #define LIST_MANAGER_ALLOC_SIZE 10
@@ -59,78 +61,24 @@ typedef struct {
 	list_t *compiledLines;
 
 	list_t *definitions;
+	string_t *includeStatements;
 	list_t *classes; // list of class_t
 
 	string_t* directory;
 	FILE *inputFile;
-	FILE *outputFile;
-	
-	num scope
+
+	int scope;
 	num currentClass // index of the current class found in the list of classes
 } compiler_t;
 
 typedef struct {
 	string_t *name;
-	list_t *variables;
+
+	string_t *includeStatements;
+	list_t *definitions; // and definitions
+	list_t *prototypes; // function prototypes
 	list_t *restOfLines;
 } class_t;
-
-// Exception Stuff
-void throw_exception(exception e, int lineNum, char *message, ...);
-
-// String stuff
-static string_t* custom_string_init(size_t allocationSize);
-static void string_meminspection(size_t addNum, string_t *subject);
-string_t* string_init();
-string_t* string_copyvalueof(char *src);
-string_t* string_copyvalueof_s(string_t *src);
-void string_printf(string_t *dest, char *format, ...);
-void string_append(string_t *dest, char *src);
-void string_append_s(string_t *dest, string_t *src);
-void string_appendchar(string_t *dest, char letter);
-int string_indexof_s(string_t *src, char *stopSign);
-string_t** string_split(char delimiter, string_t *src);
-bool string_equals(string_t *dest, const char *src);
-bool string_equals_s(string_t *dest, string_t *src);
-bool string_equalsignorecase(string_t *dest, const char *src);
-bool string_equalsignorecase_s(string_t *dest, string_t *src);
-bool string_startswith(string_t *src, const char *search);
-bool string_startswith_s(string_t *src, string_t *search);
-string_t* string_substring_s(int startIndex, int endIndex, string_t *src);
-void string_tolowercase_s(string_t *dest);
-bool string_serialize(string_t *src, FILE *stream);
-string_t* string_deserialize(FILE *stream);
-void string_reset(string_t *dest);
-void string_free(void *dest);
-
-// List Stuff
-static list_t* custom_list_init(size_t mallocSize);
-static void list_meminspector(size_t addNum, list_t *subject);
-list_t* list_init();
-void list_add(void *item, list_t *list);
-void list_remove(int index, list_t *list);
-void list_complete_remove(void (*indivfree)(void*), int index, list_t *list);
-void list_clear(list_t *list);
-bool list_equals(void *destComp, int index,
-bool (*equalsComparator)(void*, void*), list_t *list);
-bool list_contains(void *destComp, bool (*equalsComparator)(void*, void*),
-		list_t *list);
-void list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list);
-list_t* list_deserialize(void* (*indivreverse)(FILE*), FILE *stream);
-void list_free(list_t *list);
-void list_complete_free(void (*indivfree)(void*), list_t *list);
-
-// Compiler Functions
-compiler_t* compiler_init(string_t *directory, FILE *inputFile, FILE *outputFile);
-void compiler_free(compiler_t *com);
-void ignition(compiler_t *com);
-void readAllLines(compiler_t *com);
-static bool readLine(FILE *stream, string_t *line);
-void parse(compiler_t *com);
-static list_t* split(char delimiter, string_t *line);
-static bool isSpecialCharacter(char alpha);
-void compile(compiler_t *com);
-int writeToFile(compiler_t *com);
 
 // Horse Identifiers
 const char *functionIdentifier = "function";
@@ -153,30 +101,41 @@ const char *numDataType = "long long int";
 const char *defFileName = "DEF";
 
 function main(int argc, char **argv) returns int
-	string_t *inputFilename, *outputFilename, *directory;
+	string_t *inputFilename, *directory;
 	// Arguments: [compiler executable] [directory] [directory/inputFile] [directory/outputFile]
 	if (argc >= 4) then
 		printf("[Debug] Successfully accessing the command line arguments!\n");
-		directory = string_copyvalueof(argv[1]);
-		inputFilename = string_copyvalueof(argv[2]);
-		outputFilename = string_copyvalueof(argv[3]);
+		int i = 1;
+		directory = string_copyvalueof(argv[i]);
+		while i < argc - 1 do
+			inputFilename = string_copyvalueof(argv[i + 1]);
+			startCompiler(directory, inputFilename);
+			// Free resources
+			string_free(inputFilename);
+			i += 3;
+		end
 	or 
 		directory = string_copyvalueof("src");
 		inputFilename = string_copyvalueof("src/compl.hr");
-		outputFilename = string_copyvalueof("src/compl.c");
+		startCompiler(directory, inputFilename);
+		// Free resources
+		string_free(inputFilename);
 	end
-	
-	FILE *input = fopen(inputFilename->text, "r");
-	FILE *output = fopen(outputFilename->text, "w");
-
-	compiler_t *com = compiler_init(directory, input, output);
-	ignition(com);
-	compiler_free(com);
 
 	return 0;
 end
 
-function compiler_init(string_t* directory, FILE *inputFile, FILE *outputFile) returns compiler_t*
+function startCompiler(string_t *directory, string_t *inputFilename) returns void
+	FILE *input = fopen(inputFilename->text, "r");
+
+	compiler_t *com = compiler_init(directory, input);
+	ignition(com);
+	compiler_free(com);
+
+	fclose(input);
+end
+
+function compiler_init(string_t* directory, FILE *inputFile) returns compiler_t*
 	compiler_t *com = malloc(sizeof(compiler_t));
 	com->allLines = list_init();
 	com->cleanedLines = list_init();
@@ -184,20 +143,21 @@ function compiler_init(string_t* directory, FILE *inputFile, FILE *outputFile) r
 	com->compiledLines = list_init();
 
 	com->definitions = list_init();
+	com->includeStatements = string_init();
 	com->classes = list_init();
 
 	com->directory = directory;
 	com->inputFile = inputFile;
-	com->outputFile = outputFile;
+
+	com->scope = 0;
 	com->currentClass = -1; // currently in no class
 	return com;
 end
 
 function compiler_free(compiler_t *com) returns void
+	// for now, it is commented out due to a "free" error
 	list_complete_free(&string_free, com->allLines);
-	for i to (int)com->parsedLines->data_length do i++
-		list_complete_free(&string_free, com->parsedLines->data[i]);
-	end
+	list_complete_free(&string_free, com->parsedLines);
 	list_complete_free(&string_free, com->compiledLines);
 	free(com);
 end
@@ -243,6 +203,7 @@ private function split(char delimiter, string_t *line) returns list_t*
 	list_t *output = list_init();
 	string_t *temp = string_init();
 	bool isSpecial = false;
+	// char previous = NULL;
 	for i to (int)line->text_length do i++
 		char alpha = line->text[i];
 		if isSpecialCharacter(alpha) then
@@ -250,8 +211,9 @@ private function split(char delimiter, string_t *line) returns list_t*
 		or if !isSpecial && alpha == delimiter then
 			list_add(string_copyvalueof_s(temp), output);
 			string_reset(temp);
-		end
-		string_appendchar(temp, alpha);
+		or
+			string_appendchar(temp, alpha);
+		end	
 	end
 	list_add(temp, output);
 	return output;
@@ -261,10 +223,14 @@ private function isSpecialCharacter(char alpha) returns bool
 	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
 end
 
-function class_new(string_t *name) returns class_t*
+function class_new(string_t *name, string_t *includeStatements) returns class_t*
 	class_t *newClass = malloc(sizeof(class_t));
-	newClass->name = string_copyvalueof_s(name);
-	newClass->variables = list_init();
+	newClass->name = name;
+
+	newClass->includeStatements = includeStatements;
+	newClass->definitions = list_init();
+	newClass->prototypes = list_init();
+
 	newClass->restOfLines = list_init();
 	return newClass;
 end
@@ -281,8 +247,9 @@ function compile(compiler_t *com) returns void
 		// printf("First token: %s\n", firstToken->text);
 		if string_equals(firstToken, classIdentifier) then
 			// class blah not class blah extends object
-			string_t *className = string_substring_s(strlen(classIdentifier) + 1, line->text_length, line);
-			list_add(class_new(className), com->classes);
+			list_add(class_new(string_copyvalueof_s((string_t*) tokens->data[1]), string_copyvalueof_s(com->includeStatements)), com->classes);
+			string_reset(com->includeStatements);
+
 			com->currentClass++;
 			continue;
 
@@ -291,7 +258,10 @@ function compile(compiler_t *com) returns void
 			parsed = string_init();
 			string_t *function = string_substring_s(strlen(functionIdentifier), string_indexof_s(line, "returns"), line);
 			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
-			string_printf(parsed, " %s %s {", returnType->text, function->text);
+			string_printf(parsed, " %s %s", returnType->text, function->text);
+			addFunctionHeader(parsed, com);
+			string_append(parsed, " {");
+
 			com->scope++;
 
 		or if string_startswith(line, privateFunctionIdentifier) then
@@ -299,11 +269,18 @@ function compile(compiler_t *com) returns void
 			parsed = string_init();
 			string_t *function = string_substring_s(strlen(privateFunctionIdentifier), string_indexof_s(line, "returns"), line);
 			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
-			string_printf(parsed, "static %s %s {", returnType->text, function->text);
+			string_printf(parsed, "static %s %s", returnType->text, function->text);
+			addFunctionHeader(parsed, com);
+			string_append(parsed, " {");
+
+			com->scope++;
 
 		or if string_startswith(line, endIdentifier) then
 			parsed = string_copyvalueof("}");
+			list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
 			com->scope--;
+			continue; // skip the mess! 
+			// TODO: fix this mess
 
 		or if string_startswith(line, ifIdentifier) then
 			// if blah then
@@ -316,12 +293,10 @@ function compile(compiler_t *com) returns void
 			parsed = string_init();
 			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword) - 2, line);
 			string_printf(parsed, "} else if (%s) {", middle->text);
-			com->scope++;
 		
 		or if string_startswith(line, elseIdentifier) then
 			parsed = string_init();
 			string_append(parsed, "} else {");
-			com->scope++;
 
 		or if string_startswith(line, forIdentifier) then
 			// for i to 5 do i++
@@ -330,6 +305,7 @@ function compile(compiler_t *com) returns void
 			string_t *condition = string_substring_s(string_indexof_s(line, "to") + strlen("to"), string_indexof_s(line, "do"), line);
 			string_t *increment = string_substring_s(string_indexof_s(line, "do") + strlen("do"), line->text_length, line);
 			string_printf(parsed, "for (long long int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
+
 			com->scope++;
 		
 		or if string_startswith(line, whileIdentifier) then
@@ -337,21 +313,27 @@ function compile(compiler_t *com) returns void
 			parsed = string_init();
 			string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
 			string_printf(parsed, "while (%s) {", condition->text);
+
 			com->scope++;
 
 		or if string_startswith(line, importIdentifier) then
 			// add basics to imports
-			parsed = string_init();
+			string_t *includeStatement = string_init();
 			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
 
 			if string_startswith(importItem, "basics") then
-				string_append(parsed, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n");
-				string_printf(parsed, "#include \"__%s__.h\"", defFileName);
+				string_append(includeStatement, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n");
+				string_printf(includeStatement, "#include \"__%s__.h\"", defFileName);
 			or
-				string_printf(parsed, "#include \"%s.h\"", importItem->text);
-
-			printf("Parsed Import Item: %s\n", parsed->text);	
+				string_printf(includeStatement, "#include \"%s.h\"", importItem->text);	
 			end
+			string_append_s(com->includeStatements, includeStatement);
+			string_append(com->includeStatements, "\n");
+
+			// Free resources and continue
+			string_free(includeStatement);
+			string_free(importItem);
+			continue; // don't add it to the restOfLines list
 
 		or if string_equals(firstToken, numIdentifier) then
 			// num something = 5
@@ -365,12 +347,27 @@ function compile(compiler_t *com) returns void
 		or
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 		end
-		list_add(parsed, com->compiledLines);
+
+		if com->classes->data_length > 0 && com->scope > 0 then
+			list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
+		or if com->classes->data_length > 0 && com->scope <= 0 then
+			addDefinitionToHeader(parsed, com);
+		end	
+
 	end
 end	
 
+private function addFunctionHeader(string_t *functionBody, compiler_t *com) returns void
+	string_t *funct = string_init();
+	string_printf(funct, "%s;", functionBody->text);
+	list_add(funct, ((class_t*)com->classes->data[com->currentClass])->prototypes);
+end
+
+private function addDefinitionToHeader(string_t *definition, compiler_t *com) returns void
+	list_add(definition, ((class_t*) com->classes->data[com->currentClass])->definitions);
+end
+
 function writeToFile(compiler_t *com) returns int
-	FILE *output = com->outputFile;
 	string_t *fullDefPath = string_init();
 
 	// Double underscore is a used as a way to indicate that the file is Horse language specific	
@@ -388,13 +385,45 @@ function writeToFile(compiler_t *com) returns int
 	string_free(fullDefPath);
 	fclose(definitions);
 
-	for i to (int) com->compiledLines->data_length do i++
-		fprintf(output, "%s\n", ((string_t*) com->compiledLines->data[i])->text);		
-	end
-	// Debug
-	printf("[writeToFile] Successfully wrote to File!");
+	for i to com->classes->data_length do i++
+		class_t *currentClass = (class_t*) com->classes->data[i];
+		string_t *fullHeaderPath = string_init();
+		string_t *fullSourcePath = string_init();
+		string_printf(fullHeaderPath, "src/%s.h", currentClass->name->text);
+		string_printf(fullSourcePath, "src/%s.c", currentClass->name->text);
 
-	return fclose(output);
+		// Writing header to file
+		FILE *headerFile = fopen(fullHeaderPath->text, "w");
+		fprintf(headerFile, "// This file was automatically generated by the horse compiler\n");
+		fprintf(headerFile, "#ifndef %s_H_\n", currentClass->name->text);
+		fprintf(headerFile, "#define %s_H_\n", currentClass->name->text);
+		fprintf(headerFile, "#include \"__%s__.h\"\n", defFileName); // core definitions of Horse
+
+		// Add includes to file
+		fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
+		for j to currentClass->definitions->data_length do j++
+			fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
+		end	
+		for j to currentClass->prototypes->data_length do j++
+			fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
+		end
+		fprintf(headerFile, "#endif\n");
+		fclose(headerFile);
+		
+		// Writing source to file
+		FILE *sourceFile = fopen(fullSourcePath->text, "w");
+		fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
+		fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
+		for j to currentClass->restOfLines->data_length do j++
+			fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
+			// Test	
+			fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
+		end
+		fclose(sourceFile);
+		
+		string_free(fullHeaderPath);
+		string_free(fullSourcePath);
+	end	
 end
 
 ////// LIBRARIES //////
@@ -530,7 +559,7 @@ private function custom_string_init(size_t allocationSize) returns string_t*
 end
 
 function string_copyvalueof(char *src) returns string_t*
-	num srcLength = strlen(src);
+	size_t srcLength = strlen(src);
 
 	string_t *dest = malloc(sizeof(string_t));
 	dest->text = strdup(src);
