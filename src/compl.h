@@ -47,8 +47,8 @@ typedef struct {
 	string_t* directory;
 	FILE *inputFile;
 
-	int scope;
-long long int currentClass;
+	num scope;
+	num currentClass; // index of the current class found in the list of classes
 } compiler_t;
 
 typedef struct {
@@ -70,11 +70,14 @@ const char *privateFunctionIdentifier = "private def";
 const char *endIdentifier = "end";
 const char *returnIdentifier = "return";
 
+const char *forIdentifier = "for";
+const char *toKeyword = "to";
+const char *doKeyword = "do";
+
 const char *thenKeyword = "then";
 const char *ifIdentifier = "if"; // for now
 const char *elseIfIdentifier = "or if";
 const char *elseIdentifier = "or";
-const char *forIdentifier = "for";
 const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
@@ -96,6 +99,13 @@ const char *defFileName = "DEF";
 
 
 
+
+// Handling certain declarations //
+
+
+
+
+// Helper functions //
 
 
 
@@ -158,6 +168,9 @@ static  list_t* compl_split(char delimiter, string_t *line) ;
 static  bool compl_isSpecialCharacter(char alpha) ;
  class_t* compl_class_new(string_t *name, string_t *includeStatements) ;
  void compl_compile(compiler_t *com) ;
+static  void compl_handleForLoop(string_t *line, string_t *dest) ;
+static  void compl_handleFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest) ;
+static  void compl_handlePrivateFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest) ;
 static  void compl_addFunctionHeader(string_t *functionBody, compiler_t *com) ;
 static  void compl_addSourceFunctionDefinition(string_t *functionName, compiler_t *com) ;
 static  void compl_addDefinitionToHeader(string_t *definition, compiler_t *com) ;

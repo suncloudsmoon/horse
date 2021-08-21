@@ -11,6 +11,9 @@
 #define isSpecialCharacter compl_isSpecialCharacter
 #define class_new compl_class_new
 #define compile compl_compile
+#define handleForLoop compl_handleForLoop
+#define handleFunction compl_handleFunction
+#define handlePrivateFunction compl_handlePrivateFunction
 #define addFunctionHeader compl_addFunctionHeader
 #define addSourceFunctionDefinition compl_addSourceFunctionDefinition
 #define addDefinitionToHeader compl_addDefinitionToHeader
@@ -138,7 +141,7 @@ while ( (letter = fgetc(stream)) != EOF && letter != '\n' ) {
 return letter == EOF;
 }
  void compl_parse(compiler_t *com)  {
-for (long long int  i  = 0;  i  <  (int)com->allLines->data_length ;  i++) {
+for (num  i =  0 ;  i <  (int)com->allLines->data_length ;  i++) {
 		string_t *existingLine = (string_t*) com->allLines->data[i];
 		int firstLetter = strcspn(existingLine->text,
 				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
@@ -154,7 +157,7 @@ static  list_t* compl_split(char delimiter, string_t *line)  {
 	string_t *temp = string_init();
 	bool isSpecial = false;
 	// char previous = NULL;
-for (long long int  i  = 0;  i  <  (int)line->text_length ;  i++) {
+for (num  i =  0 ;  i <  (int)line->text_length ;  i++) {
 		char alpha = line->text[i];
 if ( isSpecialCharacter(alpha) ) {
 			isSpecial = !isSpecial;
@@ -188,12 +191,11 @@ return newClass;
 	// add definitions to file
 	list_add(string_copyvalueof("#define num long long int"), com->definitions);
 	string_t *parsed;
-for (long long int  i  = 0;  i  <  (int) com->parsedLines->data_length ;  i++) {
+for (num  i =  0 ;  i <  (int) com->parsedLines->data_length ;  i++) {
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
 		string_t *line = (string_t*) com->cleanedLines->data[i];
 
-		// printf("First token: %s\n", firstToken->text);
 if ( string_equals(firstToken, classIdentifier) ) {
 			// class blah not class blah extends object
 			list_add(class_new(string_copyvalueof_s((string_t*) tokens->data[1]), string_copyvalueof_s(com->includeStatements)), com->classes);
@@ -204,51 +206,16 @@ if ( string_equals(firstToken, classIdentifier) ) {
 
 } else if ( string_equals(firstToken, functionIdentifier) ) {
 			// function blah() returns void
-			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
 			parsed = string_init();
-			string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(line, "("), line);
-			string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(line, "returns"), line);
-			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
-			
-			bool isMain = string_equals(functionName, "main");
-			printf("[compile] functionName:%s %d %d\n", functionName->text, functionName->text_length, strlen("main"));
-
-if ( string_equals(functionName, "main") ) {
-				string_printf(parsed, "%s %s", returnType->text, functionBody->text);
-} else {
-				string_printf(parsed, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-				addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
-}
-
-			addFunctionHeader(parsed, com);
-
-			string_append(parsed, " {");
+			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
+			handleFunction(line, currentClass, com, parsed);
 			com->scope++;
-
-			// Free resources
-			string_free(functionName);
-			string_free(functionBody);
-			string_free(returnType);
 
 } else if ( string_startswith(line, privateFunctionIdentifier) ) {
-			// private function blah() returns void
-			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
 			parsed = string_init();
-			string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(line, "("), line);
-			string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(line, "returns"), line);
-			string_t *returnType = string_substring_s(string_indexof_s(line, "returns") + strlen("returns"), line->text_length, line);
-			string_printf(parsed, "static %s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-			
-			addSourceFunctionDefinition(functionName, com);
-			addFunctionHeader(parsed, com);
-
-			string_append(parsed, " {");
+			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
+			handlePrivateFunction(line, currentClass, com, parsed);
 			com->scope++;
-
-			// Free resources
-			string_free(functionName);
-			string_free(functionBody);
-			string_free(returnType);
 			
 } else if ( string_equals(firstToken, returnIdentifier) ) {
 			// return blah;
@@ -267,7 +234,7 @@ if ( com->scope == 1 ) {
 			parsed = string_copyvalueof("}");
 			list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
 			com->scope--;
-			continue; // skip the mess! 
+			continue;
 			// TODO: fix this mess
 
 } else if ( string_startswith(line, ifIdentifier) ) {
@@ -289,11 +256,7 @@ if ( com->scope == 1 ) {
 } else if ( string_startswith(line, forIdentifier) ) {
 			// for i to 5 do i++
 			parsed = string_init();
-			string_t *i = string_substring_s(strlen(forIdentifier), string_indexof_s(line, "to"), line);
-			string_t *condition = string_substring_s(string_indexof_s(line, "to") + strlen("to"), string_indexof_s(line, "do"), line);
-			string_t *increment = string_substring_s(string_indexof_s(line, "do") + strlen("do"), line->text_length, line);
-			string_printf(parsed, "for (long long int %s = 0; %s < %s; %s) {", i->text, i->text, condition->text, increment->text);
-
+			handleForLoop(line, parsed);
 			com->scope++;
 		
 } else if ( string_startswith(line, whileIdentifier) ) {
@@ -322,16 +285,6 @@ if ( string_startswith(importItem, "basics") ) {
 			string_free(includeStatement);
 			string_free(importItem);
 			continue; // don't add it to the restOfLines list
-
-} else if ( string_equals(firstToken, numIdentifier) ) {
-			// num something = 5
-			parsed = string_init();
-			char* variable = ((string_t *) tokens->data[1])->text;
-if ( string_indexof_s(line, "=") != -1 ) {
-				string_printf(parsed, "%s %s = %s;", numDataType, variable, ((string_t *) tokens->data[3])->text);
-} else {
-				string_printf(parsed, "%s %s;", numDataType, variable);
-}
 } else {
 			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
 }
@@ -343,6 +296,63 @@ if ( com->classes->data_length > 0 && com->scope > 0 ) {
 }
 
 }
+return;
+}
+static  void compl_handleForLoop(string_t *line, string_t *dest)  {
+	// for 0 to 5 do i++
+	string_t *startPoint = string_substring_s(strlen(forIdentifier), string_indexof_s(line, toKeyword), line);
+	string_t *endPoint = string_substring_s(string_indexof_s(line, toKeyword) + strlen(toKeyword), string_indexof_s(line, doKeyword), line);
+	
+	string_t *lineAfterDo = string_substring_s(string_indexof_s(line, doKeyword) + strlen(doKeyword), line->text_length, line);
+	string_t *conditionName = string_substring_s(0, string_indexof_s(lineAfterDo, "+"), lineAfterDo);
+	string_t *incrementValue = string_substring_s(string_indexof_s(lineAfterDo, "+"), lineAfterDo->text_length, lineAfterDo);
+
+	string_printf(dest, "for (num %s = %s; %s < %s; %s%s) {", conditionName->text, startPoint->text, conditionName->text, endPoint->text, conditionName->text, incrementValue->text);
+
+	// Free resources
+	string_free(startPoint);
+	string_free(endPoint);
+	string_free(lineAfterDo);
+	string_free(conditionName);
+	string_free(incrementValue);
+return;
+}
+static  void compl_handleFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest)  {
+	// def blah() returns void
+	string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
+	string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
+	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
+
+if ( string_equals(functionName, "main") ) {
+		string_printf(dest, "%s %s", returnType->text, functionBody->text);
+} else {
+		string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
+		addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
+}
+	addFunctionHeader(dest, com);
+	string_append(dest, " {");
+
+	// Free resources
+	string_free(functionName);
+	string_free(functionBody);
+	string_free(returnType);
+return;
+}
+static  void compl_handlePrivateFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest)  {
+	// private def blah() returns void
+	string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
+	string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
+	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
+	string_printf(dest, "static %s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
+	
+	addSourceFunctionDefinition(functionName, com);
+	addFunctionHeader(dest, com);
+	string_append(dest, " {");
+
+	// Free resources
+	string_free(functionName);
+	string_free(functionBody);
+	string_free(returnType);
 return;
 }
 static  void compl_addFunctionHeader(string_t *functionBody, compiler_t *com)  {
@@ -372,7 +382,7 @@ return;
 	fprintf(definitions, "#define %s_H_\n", defFileName);
 
 	// Writing defintions to a separate file and the user must include it in their project
-for (long long int  i  = 0;  i  <  com->definitions->data_length ;  i++) {
+for (num  i =  0 ;  i <  com->definitions->data_length ;  i++) {
 		fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
 }
 	fprintf(definitions, "#endif\n");	
@@ -380,7 +390,7 @@ for (long long int  i  = 0;  i  <  com->definitions->data_length ;  i++) {
 	string_free(fullDefPath);
 	fclose(definitions);
 
-for (long long int  i  = 0;  i  <  com->classes->data_length ;  i++) {
+for (num  i =  0 ;  i <  com->classes->data_length ;  i++) {
 		class_t *currentClass = (class_t*) com->classes->data[i];
 		string_t *fullHeaderPath = string_init();
 		string_t *fullSourcePath = string_init();
@@ -405,10 +415,10 @@ static  void compl_writeToHeaderFile(string_t *fullHeaderPath, class_t *currentC
 	
 	// Add header stuff to file
 	fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
-for (long long int  j  = 0;  j  <  currentClass->definitions->data_length ;  j++) {
+for (num  j =  0 ;  j <  currentClass->definitions->data_length ;  j++) {
 		fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
 }
-for (long long int  j  = 0;  j  <  currentClass->prototypes->data_length ;  j++) {
+for (num  j =  0 ;  j <  currentClass->prototypes->data_length ;  j++) {
 		fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
 }
 	fprintf(headerFile, "#endif\n");
@@ -422,12 +432,12 @@ static  void compl_writeToSourceFile(string_t *fullSourcePath, class_t *currentC
 	fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
 
 	// Add #defines function stuff to source file
-for (long long int  j  = 0;  j  <  currentClass->sourceDefinitions->data_length ;  j++) {
+for (num  j =  0 ;  j <  currentClass->sourceDefinitions->data_length ;  j++) {
 		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j])->text);
 }
 	
 	// Add the lump sum of all functions to the source file
-for (long long int  j  = 0;  j  <  currentClass->restOfLines->data_length ;  j++) {
+for (num  j =  0 ;  j <  currentClass->restOfLines->data_length ;  j++) {
 		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
 		// Test	
 		fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
@@ -438,10 +448,8 @@ return;
  list_t* compl_list_init()  {
 	list_t *list = malloc(sizeof(list_t));
 	list->data = (void**) malloc(LIST_MANAGER_ALLOC_SIZE * sizeof(void*));
-
 	list->data_length = 0;
 	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
-
 return list;
 }
 static  list_t* compl_custom_list_init(size_t mallocSize)  {
@@ -450,7 +458,6 @@ static  list_t* compl_custom_list_init(size_t mallocSize)  {
 
 	list->data_length = 0;
 	list->data_allocated_length = mallocSize;
-
 return list;
 }
  void compl_list_add(void *item, list_t *list)  {
@@ -483,7 +490,7 @@ if ( index < 0 || index >= (int)list->data_length ) {
 return (*equalsComparator)(destComp, list->data[index]);;
 }
  bool compl_list_contains(void *destComp, bool (*equalsComparator)(void*, void*), list_t *list)  {
-for (long long int  i  = 0;  i  <  (int) list->data_length ;  i++) {
+for (num  i =  0 ;  i <  (int) list->data_length ;  i++) {
 if ( (*equalsComparator)(destComp, list->data[i]) ) {
 return true;
 }
@@ -492,7 +499,7 @@ return false;
 }
  void compl_list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list)  {
 	fwrite(&list->data_length, sizeof(list->data_length), 1, stream);
-for (long long int  i  = 0;  i  <  (int)list->data_length ;  i++) {
+for (num  i =  0 ;  i <  (int)list->data_length ;  i++) {
 		(*indiv)(list->data[i], stream);
 }
 return;
@@ -502,7 +509,7 @@ return;
 	fread(&arrayLength, sizeof(int), 1, stream);
 
 	list_t *list = custom_list_init(arrayLength);
-for (long long int  i  = 0;  i  <  arrayLength ;  i++) {
+for (num  i =  0 ;  i <  arrayLength ;  i++) {
 		list_add((*indivreverse)(stream), list);
 }
 return list;
@@ -513,7 +520,7 @@ return list;
 return;
 }
  void compl_list_complete_free(void (*indivfree)(void*), list_t *list)  {
-for (long long int  i  = 0;  i  <  (int)list->data_length ;  i++) {
+for (num  i =  0 ;  i <  (int)list->data_length ;  i++) {
 		(*indivfree)(list->data[i]);
 }
 	list_free(list);
@@ -543,7 +550,6 @@ return;
 
 	str->text_length = 0;
 	str->text_allocated_length = STRING_ALLOCATION_SIZE;
-
 return str;
 }
 static  string_t* compl_custom_string_init(size_t allocationSize)  {
@@ -554,7 +560,6 @@ static  string_t* compl_custom_string_init(size_t allocationSize)  {
 
 	str->text_length = 0;
 	str->text_allocated_length = allocationSize;
-
 return str;
 }
  string_t* compl_string_copyvalueof(char *src)  {
@@ -564,7 +569,6 @@ return str;
 	dest->text = strdup(src);
 	dest->text_length = srcLength;
 	dest->text_allocated_length = srcLength + 1;
-
 return dest;
 }
  string_t* compl_string_copyvalueof_s(string_t *src)  {
@@ -572,14 +576,13 @@ return dest;
 	dest->text = strdup(src->text);
 	dest->text_length = src->text_length;
 	dest->text_allocated_length = src->text_length + 1;
-
 return dest;
 }
  void compl_string_printf(string_t *dest, char *format, ...)  {
 	va_list args;
 	va_start(args, format);
 	int argsLength = strlen(format);
-for (long long int  i  = 0;  i  <  argsLength ;  i++) {
+for (num  i =  0 ;  i <  argsLength ;  i++) {
 		char first = format[i];
 		char second = (i + 1 < argsLength) ? format[i+1] : '\0';
 		char *arg;
@@ -625,8 +628,8 @@ return;
  int compl_string_indexof_s(string_t *src, char *stopSign)  {
 	int stopSignLength = strlen(stopSign);
 	bool found = true;
-for (long long int  i  = 0;  i  <  (int) src->text_length - stopSignLength + 1 ;  i++) {
-for (long long int  j  = 0;  j  <  stopSignLength ;  j++) {
+for (num  i =  0 ;  i <  (int) src->text_length - stopSignLength + 1 ;  i++) {
+for (num  j =  0 ;  j <  stopSignLength ;  j++) {
 if ( src->text[i+j] != stopSign[j] ) {
 				found = false;
 				break;
@@ -662,14 +665,13 @@ return NULL;
 	strList[0] = custom_string_init(src->text_length / 2);
 	strList[1] = custom_string_init(src->text_length / 2);
 
-for (long long int  i  = 0;  i  <  splitIndex ;  i++) {
+for (num  i =  0 ;  i <  splitIndex ;  i++) {
 		string_appendchar(strList[0], src->text[i]);
 }
 	// for splitIndex + 1 to src->text_length do i++
-for (long long int  i  = 0;  i  <  (int) src->text_length ;  i++) {
+for (num  i =  0 ;  i <  (int) src->text_length ;  i++) {
 		string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
 }
-
 return strList;
 }
  bool compl_string_equals(string_t *dest, const char *src)  {
@@ -691,7 +693,7 @@ return strncmp(dest->text, src->text, src->text_length) == 0;
 if ( dest->text_length != strlen(src) ) {
 return false;
 } else {
-for (long long int  i  = 0;  i  <  (int)dest->text_length ;  i++) {
+for (num  i =  0 ;  i <  (int)dest->text_length ;  i++) {
 if ( tolower(dest->text[i]) != tolower(src[i]) ) {
 return false;
 }
@@ -703,7 +705,7 @@ return true;
 if ( dest->text_length != src->text_length ) {
 return false;
 } else {
-for (long long int  i  = 0;  i  <  (int)dest->text_length ;  i++) {
+for (num  i =  0 ;  i <  (int)dest->text_length ;  i++) {
 if ( (tolower(dest->text[i]) != tolower(src->text[i])) ) {
 return false;
 }
@@ -715,7 +717,7 @@ return true;
 if ( search->text_length > src->text_length ) {
 return false;
 }
-for (long long int  i  = 0;  i  <  (int)search->text_length ;  i++) {
+for (num  i =  0 ;  i <  (int)search->text_length ;  i++) {
 if ( src->text[i] != search->text[i] ) {
 return false;
 }
@@ -727,7 +729,7 @@ return true;;
 if ( searchLength > src->text_length ) {
 return false;
 }
-for (long long int  i  = 0;  i  <  searchLength ;  i++) {
+for (num  i =  0 ;  i <  searchLength ;  i++) {
 if ( src->text[i] != search[i] ) {
 return false;
 }
@@ -745,11 +747,10 @@ if ( totalAppend > src->text_length ) {
 	strncpy(newStr->text, src->text + startIndex, totalAppend);
 	newStr->text[totalAppend] = '\0';
 	newStr->text_length = totalAppend;
-
 return newStr;;
 }
  void compl_string_tolowercase_s(string_t *dest)  {
-for (long long int  i  = 0;  i  <  (int)dest->text_length ;  i++) {
+for (num  i =  0 ;  i <  (int)dest->text_length ;  i++) {
 		dest->text[i] = tolower(dest->text[i]);
 }
 return;
@@ -766,7 +767,6 @@ return true;;
 	string_t *str = custom_string_init(textLength + STRING_ALLOCATION_SIZE);
 	fread(str->text, sizeof(char), textLength, stream);
 	str->text_length = textLength;
-
 return str;;
 }
  void compl_string_reset(string_t *dest)  {
