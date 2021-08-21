@@ -65,9 +65,10 @@ typedef struct {
 } class_t;
 
 // Horse Identifiers
-const char *functionIdentifier = "function";
-const char *privateFunctionIdentifier = "private function";
+const char *functionIdentifier = "def";
+const char *privateFunctionIdentifier = "private def";
 const char *endIdentifier = "end";
+const char *returnIdentifier = "return";
 
 const char *thenKeyword = "then";
 const char *ifIdentifier = "if"; // for now
