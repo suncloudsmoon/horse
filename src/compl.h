@@ -11,69 +11,54 @@
 #include "ctype.h"
 #include "string.h"
 
-
 #define AVG_STRING_SIZE 32
 #define STRING_ALLOCATION_SIZE 5
 #define LIST_MANAGER_ALLOC_SIZE 10
-
 typedef enum {
-	ERRNO_EXCEPTION = 1,
-	NULL_POINTER_EXCEPTION = 2,
-	INDEX_OUT_OF_BOUNDS_EXCEPTION = 3
+ERRNO_EXCEPTION = 1,
+NULL_POINTER_EXCEPTION = 2,
+INDEX_OUT_OF_BOUNDS_EXCEPTION = 3
 } exception;
-
 typedef struct {
-	char *text;
-	size_t text_length;
-	size_t text_allocated_length;
+char *text;
+size_t text_length;
+size_t text_allocated_length;
 } string_t;
-
 typedef struct {
-	void **data;
-	size_t data_length;
-	size_t data_allocated_length;
+void **data;
+size_t data_length;
+size_t data_allocated_length;
 } list_t;
-
 typedef struct {
-	list_t *allLines; // List of all lines
-	list_t *cleanedLines;
-	list_t *parsedLines; // List of parsed lines
-	list_t *compiledLines;
-
-	list_t *definitions;
-	string_t *includeStatements;
-	list_t *classes; // list of class_t
-
-	string_t* directory;
-	FILE *inputFile;
-
-	num scope;
-	num currentClass; // index of the current class found in the list of classes
+list_t *allLines; // List of all lines
+list_t *cleanedLines;
+list_t *parsedLines; // List of parsed lines
+list_t *compiledLines;
+list_t *definitions;
+string_t *includeStatements;
+list_t *classes; // list of class_t
+string_t* directory;
+FILE *inputFile;
+num scope;
+num currentClass; // index of the current class found in the list of classes
 } compiler_t;
-
 typedef struct {
-	string_t *name;
-
-	list_t *sourceDefinitions; // like #define f compl_f
-
-	list_t *classTypedef;
-
-	string_t *includeStatements;
-	list_t *definitions; // and definitions
-	list_t *prototypes; // function prototypes
-	list_t *restOfLines;
+string_t *name;
+list_t *sourceDefinitions; // like #define f compl_f
+list_t *classTypedef;
+string_t *includeStatements;
+list_t *definitions; // and definitions
+list_t *prototypes; // function prototypes
+list_t *restOfLines;
 } class_t;
-
-// Horse Identifiers
+const char *doubleSlashComment = "//";
 const char *functionIdentifier = "def";
 const char *privateFunctionIdentifier = "private def";
 const char *endIdentifier = "end";
 const char *returnIdentifier = "return";
-
 const char *forIdentifier = "for";
 const char *toKeyword = "to";
 const char *doKeyword = "do";
-
 const char *thenKeyword = "then";
 const char *ifIdentifier = "if"; // for now
 const char *elseIfIdentifier = "or if";
@@ -82,80 +67,12 @@ const char *whileIdentifier = "while";
 const char *classIdentifier = "class";
 const char *takeIdentifier = "take"; // like switch()
 const char *importIdentifier = "import"; // add basics to imports
-
 const char *numIdentifier = "num"; // num science = 5
 const char *numDataType = "long long int";
-
 const char *defFileName = "DEF";
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Handling certain declarations //
-
-
-
-
-// Helper functions //
-
-
-
-
-
-
-
-////// LIBRARIES //////
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
-	returns -1 if no stopSign was found
+returns -1 if no stopSign was found
 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Memory related functions
-
-// TODO: add a predefined message for errors like index out of bounds exception, etc.
  int main(int argc, char **argv) ;
  void compl_startCompiler(string_t *directory, string_t *inputFilename) ;
  compiler_t* compl_compiler_init(string_t* directory, FILE *inputFile) ;
@@ -198,6 +115,7 @@ static  string_t* compl_custom_string_init(size_t allocationSize) ;
  void compl_string_append(string_t *dest, char *src) ;
  void compl_string_append_s(string_t *dest, string_t *src) ;
  void compl_string_appendchar(string_t *dest, char letter) ;
+ bool compl_string_isempty(string_t *str) ;
  int compl_string_indexof_s(string_t *src, char *stopSign) ;
  string_t** compl_string_split(char delimiter, string_t *src) ;
  bool compl_string_equals(string_t *dest, const char *src) ;

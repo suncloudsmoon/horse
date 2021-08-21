@@ -41,6 +41,7 @@
 #define string_append compl_string_append
 #define string_append_s compl_string_append_s
 #define string_appendchar compl_string_appendchar
+#define string_isempty compl_string_isempty
 #define string_indexof_s compl_string_indexof_s
 #define string_split compl_string_split
 #define string_equals compl_string_equals
@@ -58,434 +59,365 @@
 #define string_meminspection compl_string_meminspection
 #define throw_exception compl_throw_exception
  int main(int argc, char **argv)  {
-	string_t *inputFilename, *directory;
-	// Arguments: [compiler executable] [directory] [directory/inputFile] [directory/outputFile]
+string_t *inputFilename, *directory;
 if ( argc >= 4 ) {
-		printf("[Debug] Successfully accessing the command line arguments!\n");
-		int i = 1;
-		directory = string_copyvalueof(argv[i]);
+printf("[Debug] Successfully accessing the command line arguments!\n");
+int i = 1;
+directory = string_copyvalueof(argv[i]);
 while ( i < argc - 1 ) {
-			inputFilename = string_copyvalueof(argv[i + 1]);
-			startCompiler(directory, inputFilename);
-			// Free resources
-			string_free(inputFilename);
-			i += 3;
+inputFilename = string_copyvalueof(argv[i + 1]);
+startCompiler(directory, inputFilename);
+string_free(inputFilename);
+i += 3;
 }
 } else {
-		directory = string_copyvalueof("src");
-		inputFilename = string_copyvalueof("src/compl.hr");
-		startCompiler(directory, inputFilename);
-		// Free resources
-		string_free(inputFilename);
+directory = string_copyvalueof("src");
+inputFilename = string_copyvalueof("src/compl.hr");
+startCompiler(directory, inputFilename);
+string_free(inputFilename);
 }
 return 0;
 }
  void compl_startCompiler(string_t *directory, string_t *inputFilename)  {
-	FILE *input = fopen(inputFilename->text, "r");
-
-	compiler_t *com = compiler_init(directory, input);
-	ignition(com);
-	compiler_free(com);
-
-	fclose(input);
+FILE *input = fopen(inputFilename->text, "r");
+compiler_t *com = compiler_init(directory, input);
+ignition(com);
+compiler_free(com);
+fclose(input);
 return;
 }
  compiler_t* compl_compiler_init(string_t* directory, FILE *inputFile)  {
-	compiler_t *com = malloc(sizeof(compiler_t));
-	com->allLines = list_init();
-	com->cleanedLines = list_init();
-	com->parsedLines = list_init();
-	com->compiledLines = list_init();
-
-	com->definitions = list_init();
-	com->includeStatements = string_init();
-	com->classes = list_init();
-
-	com->directory = directory;
-	com->inputFile = inputFile;
-
-	com->scope = 0;
-	com->currentClass = -1; // currently in no class
+compiler_t *com = malloc(sizeof(compiler_t));
+com->allLines = list_init();
+com->cleanedLines = list_init();
+com->parsedLines = list_init();
+com->compiledLines = list_init();
+com->definitions = list_init();
+com->includeStatements = string_init();
+com->classes = list_init();
+com->directory = directory;
+com->inputFile = inputFile;
+com->scope = 0;
+com->currentClass = -1; // currently in no class
 return com;
 }
  void compl_compiler_free(compiler_t *com)  {
-	// for now, it is commented out due to a "free" error
-	list_complete_free(&string_free, com->allLines);
-	list_complete_free(&string_free, com->parsedLines);
-	list_complete_free(&string_free, com->compiledLines);
-	free(com);
+list_complete_free(&string_free, com->allLines);
+list_complete_free(&string_free, com->parsedLines);
+list_complete_free(&string_free, com->compiledLines);
+free(com);
 return;
 }
  void compl_ignition(compiler_t *com)  {
-	printf("[ignition] program starting!\n");
-	readAllLines(com);
-	parse(com);
-	compile(com);
-	writeToFile(com);
+printf("[ignition] program starting!\n");
+readAllLines(com);
+parse(com);
+compile(com);
+writeToFile(com);
 return;
 }
  void compl_readAllLines(compiler_t *com)  {
-	string_t *line = string_init();
+string_t *line = string_init();
 while ( !readLine(com->inputFile, line) ) {
-		list_add(string_copyvalueof_s(line), com->allLines);
-		string_reset(line);
+list_add(string_copyvalueof_s(line), com->allLines);
+string_reset(line);
 }
-	string_free(line);
+string_free(line);
 return;
 }
 static  bool compl_readLine(FILE *stream, string_t *line)  {
-	char letter;
+char letter;
 while ( (letter = fgetc(stream)) != EOF && letter != '\n' ) {
-		string_appendchar(line, letter);
+string_appendchar(line, letter);
 }
 return letter == EOF;
 }
  void compl_parse(compiler_t *com)  {
 for (num  i =  0 ;  i <  (int)com->allLines->data_length ;  i++) {
-		string_t *existingLine = (string_t*) com->allLines->data[i];
-		int firstLetter = strcspn(existingLine->text,
-				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
-		string_t *initialClean = string_substring_s(firstLetter,
-				existingLine->text_length, existingLine);
-		list_add(initialClean, com->cleanedLines);		
-		list_add(split(' ', initialClean), com->parsedLines);
+string_t *existingLine = (string_t*) com->allLines->data[i];
+int firstLetter = strcspn(existingLine->text,
+"!\"#$%&\'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+string_t *initialClean = string_substring_s(firstLetter,
+existingLine->text_length, existingLine);
+list_add(initialClean, com->cleanedLines);		
+list_add(split(' ', initialClean), com->parsedLines);
 }
 return;
 }
 static  list_t* compl_split(char delimiter, string_t *line)  {
-	list_t *output = list_init();
-	string_t *temp = string_init();
-	bool isSpecial = false;
-	// char previous = NULL;
+list_t *output = list_init();
+string_t *temp = string_init();
+bool isSpecial = false;
 for (num  i =  0 ;  i <  (int)line->text_length ;  i++) {
-		char alpha = line->text[i];
+char alpha = line->text[i];
 if ( isSpecialCharacter(alpha) ) {
-			isSpecial = !isSpecial;
+isSpecial = !isSpecial;
 } else if ( !isSpecial && alpha == delimiter ) {
-			list_add(string_copyvalueof_s(temp), output);
-			string_reset(temp);
+list_add(string_copyvalueof_s(temp), output);
+string_reset(temp);
 } else {
-			string_appendchar(temp, alpha);
+string_appendchar(temp, alpha);
 }
 }
-	list_add(temp, output);
+list_add(temp, output);
 return output;
 }
 static  bool compl_isSpecialCharacter(char alpha)  {
 return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';;
 }
  class_t* compl_class_new(string_t *name, string_t *includeStatements)  {
-	class_t *newClass = malloc(sizeof(class_t));
-	newClass->name = name;
-
-	newClass->sourceDefinitions = list_init();
-
-	newClass->includeStatements = includeStatements;
-	newClass->definitions = list_init();
-	newClass->prototypes = list_init();
-
-	newClass->restOfLines = list_init();
+class_t *newClass = malloc(sizeof(class_t));
+newClass->name = name;
+newClass->sourceDefinitions = list_init();
+newClass->includeStatements = includeStatements;
+newClass->definitions = list_init();
+newClass->prototypes = list_init();
+newClass->restOfLines = list_init();
 return newClass;
 }
  void compl_compile(compiler_t *com)  {
-	// add definitions to file
-	list_add(string_copyvalueof("#define num long long int"), com->definitions);
-	string_t *parsed;
+list_add(string_copyvalueof("#define num long long int"), com->definitions);
+string_t *parsed;
 for (num  i =  0 ;  i <  (int) com->parsedLines->data_length ;  i++) {
-		list_t *tokens = (list_t *) com->parsedLines->data[i];
-		string_t *firstToken = (string_t*) tokens->data[0];
-		string_t *line = (string_t*) com->cleanedLines->data[i];
-
+string_t *line = (string_t*) com->cleanedLines->data[i];
+if ( string_startswith(line, doubleSlashComment) || string_isempty(line) ) {
+continue;
+}
+list_t *tokens = (list_t *) com->parsedLines->data[i];
+string_t *firstToken = (string_t*) tokens->data[0];
 if ( string_equals(firstToken, classIdentifier) ) {
-			// class blah not class blah extends object
-			list_add(class_new(string_copyvalueof_s((string_t*) tokens->data[1]), string_copyvalueof_s(com->includeStatements)), com->classes);
-			string_reset(com->includeStatements);
-
-			com->currentClass++;
-			continue;
-
+list_add(class_new(string_copyvalueof_s((string_t*) tokens->data[1]), string_copyvalueof_s(com->includeStatements)), com->classes);
+string_reset(com->includeStatements);
+com->currentClass++;
+continue;
 } else if ( string_equals(firstToken, functionIdentifier) ) {
-			// function blah() returns void
-			parsed = string_init();
-			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
-			handleFunction(line, currentClass, com, parsed);
-			com->scope++;
-
+parsed = string_init();
+class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
+handleFunction(line, currentClass, com, parsed);
+com->scope++;
 } else if ( string_startswith(line, privateFunctionIdentifier) ) {
-			parsed = string_init();
-			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
-			handlePrivateFunction(line, currentClass, com, parsed);
-			com->scope++;
-			
+parsed = string_init();
+class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
+handlePrivateFunction(line, currentClass, com, parsed);
+com->scope++;
 } else if ( string_equals(firstToken, returnIdentifier) ) {
-			// return blah;
-			parsed = string_init();
+parsed = string_init();
 if ( com->scope == 1 ) {
-				string_printf(parsed, "%s;\n}", line->text);
-				list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
-				com->scope--;
-				continue;
+string_printf(parsed, "%s;\n}", line->text);
+list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
+com->scope--;
+continue;
 } else {
-				string_printf(parsed, "%s", line->text);
+string_printf(parsed, "%s", line->text);
 }
-			// or the return is inside a function
-
 } else if ( string_startswith(line, endIdentifier) ) {
-			parsed = string_copyvalueof("}");
-			list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
-			com->scope--;
-			continue;
-			// TODO: fix this mess
-
+parsed = string_copyvalueof("}");
+list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
+com->scope--;
+continue;
 } else if ( string_startswith(line, ifIdentifier) ) {
-			// if blah then
-			parsed = string_init();
-			string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword), line);
-			string_printf(parsed, "if (%s) {", middle->text);
-			com->scope++;
-
+parsed = string_init();
+string_t *middle = string_substring_s(strlen(ifIdentifier), line->text_length - strlen(thenKeyword), line);
+string_printf(parsed, "if (%s) {", middle->text);
+com->scope++;
 } else if ( string_startswith(line, elseIfIdentifier) ) {
-			parsed = string_init();
-			string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword), line);
-			string_printf(parsed, "} else if (%s) {", middle->text);
-		
+parsed = string_init();
+string_t *middle = string_substring_s(strlen(elseIfIdentifier), line->text_length - strlen(thenKeyword), line);
+string_printf(parsed, "} else if (%s) {", middle->text);
 } else if ( string_startswith(line, elseIdentifier) ) {
-			parsed = string_init();
-			string_append(parsed, "} else {");
-
+parsed = string_init();
+string_append(parsed, "} else {");
 } else if ( string_startswith(line, forIdentifier) ) {
-			// for i to 5 do i++
-			parsed = string_init();
-			handleForLoop(line, parsed);
-			com->scope++;
-		
+parsed = string_init();
+handleForLoop(line, parsed);
+com->scope++;
 } else if ( string_startswith(line, whileIdentifier) ) {
-			// while blah do
-			parsed = string_init();
-			string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
-			string_printf(parsed, "while (%s) {", condition->text);
-
-			com->scope++;
-
+parsed = string_init();
+string_t *condition = string_substring_s(strlen(whileIdentifier), string_indexof_s(line, "do"), line);
+string_printf(parsed, "while (%s) {", condition->text);
+com->scope++;
 } else if ( string_startswith(line, importIdentifier) ) {
-			// add basics to imports
-			string_t *includeStatement = string_init();
-			string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
-
+string_t *includeStatement = string_init();
+string_t *importItem = string_substring_s(strlen(importIdentifier) + 1, line->text_length, line);
 if ( string_startswith(importItem, "basics") ) {
-				string_append(includeStatement, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n");
-				string_printf(includeStatement, "#include \"__%s__.h\"", defFileName);
+string_append(includeStatement, "#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n");
+string_printf(includeStatement, "#include \"__%s__.h\"", defFileName);
 } else {
-				string_printf(includeStatement, "#include \"%s.h\"", importItem->text);	
+string_printf(includeStatement, "#include \"%s.h\"", importItem->text);	
 }
-			string_append_s(com->includeStatements, includeStatement);
-			string_append(com->includeStatements, "\n");
-
-			// Free resources and continue
-			string_free(includeStatement);
-			string_free(importItem);
-			continue; // don't add it to the restOfLines list
+string_append_s(com->includeStatements, includeStatement);
+string_append(com->includeStatements, "\n");
+string_free(includeStatement);
+string_free(importItem);
+continue; // don't add it to the restOfLines list
 } else {
-			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
+parsed = line;
 }
-
 if ( com->classes->data_length > 0 && com->scope > 0 ) {
-			list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
+list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
 } else if ( com->classes->data_length > 0 && com->scope <= 0 ) {
-			addDefinitionToHeader(parsed, com);
+addDefinitionToHeader(parsed, com);
 }
-
 }
 return;
 }
 static  void compl_handleForLoop(string_t *line, string_t *dest)  {
-	// for 0 to 5 do i++
-	string_t *startPoint = string_substring_s(strlen(forIdentifier), string_indexof_s(line, toKeyword), line);
-	string_t *endPoint = string_substring_s(string_indexof_s(line, toKeyword) + strlen(toKeyword), string_indexof_s(line, doKeyword), line);
-	
-	string_t *lineAfterDo = string_substring_s(string_indexof_s(line, doKeyword) + strlen(doKeyword), line->text_length, line);
-	string_t *conditionName = string_substring_s(0, string_indexof_s(lineAfterDo, "+"), lineAfterDo);
-	string_t *incrementValue = string_substring_s(string_indexof_s(lineAfterDo, "+"), lineAfterDo->text_length, lineAfterDo);
-
-	string_printf(dest, "for (num %s = %s; %s < %s; %s%s) {", conditionName->text, startPoint->text, conditionName->text, endPoint->text, conditionName->text, incrementValue->text);
-
-	// Free resources
-	string_free(startPoint);
-	string_free(endPoint);
-	string_free(lineAfterDo);
-	string_free(conditionName);
-	string_free(incrementValue);
+string_t *startPoint = string_substring_s(strlen(forIdentifier), string_indexof_s(line, toKeyword), line);
+string_t *endPoint = string_substring_s(string_indexof_s(line, toKeyword) + strlen(toKeyword), string_indexof_s(line, doKeyword), line);
+string_t *lineAfterDo = string_substring_s(string_indexof_s(line, doKeyword) + strlen(doKeyword), line->text_length, line);
+string_t *conditionName = string_substring_s(0, string_indexof_s(lineAfterDo, "+"), lineAfterDo);
+string_t *incrementValue = string_substring_s(string_indexof_s(lineAfterDo, "+"), lineAfterDo->text_length, lineAfterDo);
+string_printf(dest, "for (num %s = %s; %s < %s; %s%s) {", conditionName->text, startPoint->text, conditionName->text, endPoint->text, conditionName->text, incrementValue->text);
+string_free(startPoint);
+string_free(endPoint);
+string_free(lineAfterDo);
+string_free(conditionName);
+string_free(incrementValue);
 return;
 }
 static  void compl_handleFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest)  {
-	// def blah() returns void
-	string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
-	string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
-	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
-
+string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
+string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
+string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
 if ( string_equals(functionName, "main") ) {
-		string_printf(dest, "%s %s", returnType->text, functionBody->text);
+string_printf(dest, "%s %s", returnType->text, functionBody->text);
 } else {
-		string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-		addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
+string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
+addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
 }
-	addFunctionHeader(dest, com);
-	string_append(dest, " {");
-
-	// Free resources
-	string_free(functionName);
-	string_free(functionBody);
-	string_free(returnType);
+addFunctionHeader(dest, com);
+string_append(dest, " {");
+string_free(functionName);
+string_free(functionBody);
+string_free(returnType);
 return;
 }
 static  void compl_handlePrivateFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest)  {
-	// private def blah() returns void
-	string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
-	string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
-	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
-	string_printf(dest, "static %s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-	
-	addSourceFunctionDefinition(functionName, com);
-	addFunctionHeader(dest, com);
-	string_append(dest, " {");
-
-	// Free resources
-	string_free(functionName);
-	string_free(functionBody);
-	string_free(returnType);
+string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
+string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
+string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
+string_printf(dest, "static %s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
+addSourceFunctionDefinition(functionName, com);
+addFunctionHeader(dest, com);
+string_append(dest, " {");
+string_free(functionName);
+string_free(functionBody);
+string_free(returnType);
 return;
 }
 static  void compl_addFunctionHeader(string_t *functionBody, compiler_t *com)  {
-	string_t *funct = string_init();
-	string_printf(funct, "%s;", functionBody->text);
-	list_add(funct, ((class_t*)com->classes->data[com->currentClass])->prototypes);
+string_t *funct = string_init();
+string_printf(funct, "%s;", functionBody->text);
+list_add(funct, ((class_t*)com->classes->data[com->currentClass])->prototypes);
 return;
 }
 static  void compl_addSourceFunctionDefinition(string_t *functionName, compiler_t *com)  {
-	class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
-	string_t *def = string_init();
-	string_printf(def, "#define %s %s_%s", functionName->text, currentClass->name->text, functionName->text);
-	list_add(def, currentClass->sourceDefinitions);
+class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
+string_t *def = string_init();
+string_printf(def, "#define %s %s_%s", functionName->text, currentClass->name->text, functionName->text);
+list_add(def, currentClass->sourceDefinitions);
 return;
 }
 static  void compl_addDefinitionToHeader(string_t *definition, compiler_t *com)  {
-	list_add(definition, ((class_t*) com->classes->data[com->currentClass])->definitions);
+list_add(definition, ((class_t*) com->classes->data[com->currentClass])->definitions);
 return;
 }
  int compl_writeToFile(compiler_t *com)  {
-	string_t *fullDefPath = string_init();
-
-	// Double underscore is a used as a way to indicate that the file is Horse language specific	
-	string_printf(fullDefPath, "%s/__%s__.h", com->directory->text, defFileName);
-	FILE *definitions = fopen(fullDefPath->text, "w");
-	fprintf(definitions, "#ifndef %s_H_\n", defFileName);
-	fprintf(definitions, "#define %s_H_\n", defFileName);
-
-	// Writing defintions to a separate file and the user must include it in their project
+string_t *fullDefPath = string_init();
+string_printf(fullDefPath, "%s/__%s__.h", com->directory->text, defFileName);
+FILE *definitions = fopen(fullDefPath->text, "w");
+fprintf(definitions, "#ifndef %s_H_\n", defFileName);
+fprintf(definitions, "#define %s_H_\n", defFileName);
 for (num  i =  0 ;  i <  com->definitions->data_length ;  i++) {
-		fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
+fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
 }
-	fprintf(definitions, "#endif\n");	
-	// Free memory
-	string_free(fullDefPath);
-	fclose(definitions);
-
+fprintf(definitions, "#endif\n");	
+string_free(fullDefPath);
+fclose(definitions);
 for (num  i =  0 ;  i <  com->classes->data_length ;  i++) {
-		class_t *currentClass = (class_t*) com->classes->data[i];
-		string_t *fullHeaderPath = string_init();
-		string_t *fullSourcePath = string_init();
-		string_printf(fullHeaderPath, "src/%s.h", currentClass->name->text);
-		string_printf(fullSourcePath, "src/%s.c", currentClass->name->text);
-
-		writeToHeaderFile(fullHeaderPath, currentClass);
-		writeToSourceFile(fullSourcePath, currentClass);
-		
-		string_free(fullHeaderPath);
-		string_free(fullSourcePath);
+class_t *currentClass = (class_t*) com->classes->data[i];
+string_t *fullHeaderPath = string_init();
+string_t *fullSourcePath = string_init();
+string_printf(fullHeaderPath, "src/%s.h", currentClass->name->text);
+string_printf(fullSourcePath, "src/%s.c", currentClass->name->text);
+writeToHeaderFile(fullHeaderPath, currentClass);
+writeToSourceFile(fullSourcePath, currentClass);
+string_free(fullHeaderPath);
+string_free(fullSourcePath);
 }
 return 0;
 }
 static  void compl_writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass)  {
-	// Writing header to file
-	FILE *headerFile = fopen(fullHeaderPath->text, "w");
-	fprintf(headerFile, "// This file was automatically generated by the horse compiler\n");
-	fprintf(headerFile, "#ifndef %s_H_\n", currentClass->name->text);
-	fprintf(headerFile, "#define %s_H_\n", currentClass->name->text);
-	fprintf(headerFile, "#include \"__%s__.h\"\n", defFileName); // core definitions of Horse
-	
-	// Add header stuff to file
-	fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
+FILE *headerFile = fopen(fullHeaderPath->text, "w");
+fprintf(headerFile, "// This file was automatically generated by the horse compiler\n");
+fprintf(headerFile, "#ifndef %s_H_\n", currentClass->name->text);
+fprintf(headerFile, "#define %s_H_\n", currentClass->name->text);
+fprintf(headerFile, "#include \"__%s__.h\"\n", defFileName); // core definitions of Horse
+fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
 for (num  j =  0 ;  j <  currentClass->definitions->data_length ;  j++) {
-		fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
+fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
 }
 for (num  j =  0 ;  j <  currentClass->prototypes->data_length ;  j++) {
-		fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
+fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
 }
-	fprintf(headerFile, "#endif\n");
-	fclose(headerFile);
+fprintf(headerFile, "#endif\n");
+fclose(headerFile);
 return;
 }
 static  void compl_writeToSourceFile(string_t *fullSourcePath, class_t *currentClass)  {
-	// Writing source to file
-	FILE *sourceFile = fopen(fullSourcePath->text, "w");
-	fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
-	fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
-
-	// Add #defines function stuff to source file
+FILE *sourceFile = fopen(fullSourcePath->text, "w");
+fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
+fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
 for (num  j =  0 ;  j <  currentClass->sourceDefinitions->data_length ;  j++) {
-		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j])->text);
+fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j])->text);
 }
-	
-	// Add the lump sum of all functions to the source file
 for (num  j =  0 ;  j <  currentClass->restOfLines->data_length ;  j++) {
-		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
-		// Test	
-		fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
+fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
+fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
 }
-	fclose(sourceFile);
+fclose(sourceFile);
 return;
 }
  list_t* compl_list_init()  {
-	list_t *list = malloc(sizeof(list_t));
-	list->data = (void**) malloc(LIST_MANAGER_ALLOC_SIZE * sizeof(void*));
-	list->data_length = 0;
-	list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
+list_t *list = malloc(sizeof(list_t));
+list->data = (void**) malloc(LIST_MANAGER_ALLOC_SIZE * sizeof(void*));
+list->data_length = 0;
+list->data_allocated_length = LIST_MANAGER_ALLOC_SIZE;
 return list;
 }
 static  list_t* compl_custom_list_init(size_t mallocSize)  {
-	list_t *list = malloc(sizeof(list_t));
-	list->data = (void**) malloc(mallocSize * sizeof(void*));
-
-	list->data_length = 0;
-	list->data_allocated_length = mallocSize;
+list_t *list = malloc(sizeof(list_t));
+list->data = (void**) malloc(mallocSize * sizeof(void*));
+list->data_length = 0;
+list->data_allocated_length = mallocSize;
 return list;
 }
  void compl_list_add(void *item, list_t *list)  {
-	list_meminspector(1, list);
-	list->data[list->data_length] = item;
-	list->data_length++;
+list_meminspector(1, list);
+list->data[list->data_length] = item;
+list->data_length++;
 return;
 }
  void compl_list_remove(int index, list_t *list)  {
-	unsigned bytes = sizeof(void*) * (list->data_allocated_length - index - 1);
-	memmove(&list->data[index], &list->data[index+1], bytes);
-	list->data_length--;
+unsigned bytes = sizeof(void*) * (list->data_allocated_length - index - 1);
+memmove(&list->data[index], &list->data[index+1], bytes);
+list->data_length--;
 return;
 }
  void compl_list_complete_remove(void (*indivfree)(void*), int index, list_t *list)  {
-	(*indivfree)(list->data[index]); // frees it from the respective free method for the unknown type data
-	list_remove(index, list);
+(*indivfree)(list->data[index]); // frees it from the respective free method for the unknown type data
+list_remove(index, list);
 return;
 }
  void compl_list_clear(list_t *list)  {
-	list->data_length = 0;
+list->data_length = 0;
 return;
 }
  bool compl_list_equals(void *destComp, int index, bool (*equalsComparator)(void*, void*), list_t *list)  {
 if ( index < 0 || index >= (int)list->data_length ) {
-		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
-				"Tried to access a list in index %d that was out of bounds!",
-				index);
+throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
+"Tried to access a list in index %d that was out of bounds!",
+index);
 }
 return (*equalsComparator)(destComp, list->data[index]);;
 }
@@ -498,184 +430,180 @@ return true;
 return false;
 }
  void compl_list_serialize(void (*indiv)(void*, FILE*), FILE *stream, list_t *list)  {
-	fwrite(&list->data_length, sizeof(list->data_length), 1, stream);
+fwrite(&list->data_length, sizeof(list->data_length), 1, stream);
 for (num  i =  0 ;  i <  (int)list->data_length ;  i++) {
-		(*indiv)(list->data[i], stream);
+(*indiv)(list->data[i], stream);
 }
 return;
 }
  list_t* compl_list_deserialize(void* (*indivreverse)(FILE*), FILE *stream)  {
-	int arrayLength;
-	fread(&arrayLength, sizeof(int), 1, stream);
-
-	list_t *list = custom_list_init(arrayLength);
+int arrayLength;
+fread(&arrayLength, sizeof(int), 1, stream);
+list_t *list = custom_list_init(arrayLength);
 for (num  i =  0 ;  i <  arrayLength ;  i++) {
-		list_add((*indivreverse)(stream), list);
+list_add((*indivreverse)(stream), list);
 }
 return list;
 }
  void compl_list_free(list_t *list)  {
-	free(list->data);
-	free(list);
+free(list->data);
+free(list);
 return;
 }
  void compl_list_complete_free(void (*indivfree)(void*), list_t *list)  {
 for (num  i =  0 ;  i <  (int)list->data_length ;  i++) {
-		(*indivfree)(list->data[i]);
+(*indivfree)(list->data[i]);
 }
-	list_free(list);
+list_free(list);
 return;
 }
 static  void compl_list_meminspector(size_t addNum, list_t *subject)  {
 if ( subject->data_length + addNum >= subject->data_allocated_length ) {
-		size_t newSize = 1.5 * subject->data_allocated_length + addNum;
-		void **new_ptr = (void**) realloc(subject->data,
-				newSize * sizeof(void*));
+size_t newSize = 1.5 * subject->data_allocated_length + addNum;
+void **new_ptr = (void**) realloc(subject->data,
+newSize * sizeof(void*));
 if ( new_ptr == NULL ) {
-			throw_exception(NULL_POINTER_EXCEPTION, -1,
-					"Unable to allocate memory for list with length %d!",
-					subject->data_length);
+throw_exception(NULL_POINTER_EXCEPTION, -1,
+"Unable to allocate memory for list with length %d!",
+subject->data_length);
 }
-
-		subject->data = new_ptr;
-		subject->data_allocated_length = newSize;
+subject->data = new_ptr;
+subject->data_allocated_length = newSize;
 }
 return;
 }
  string_t* compl_string_init()  {
-	string_t *str = malloc(sizeof(string_t));
-
-	str->text = malloc(STRING_ALLOCATION_SIZE * sizeof(char));
-	str->text[0] = '\0';
-
-	str->text_length = 0;
-	str->text_allocated_length = STRING_ALLOCATION_SIZE;
+string_t *str = malloc(sizeof(string_t));
+str->text = malloc(STRING_ALLOCATION_SIZE * sizeof(char));
+str->text[0] = '\0';
+str->text_length = 0;
+str->text_allocated_length = STRING_ALLOCATION_SIZE;
 return str;
 }
 static  string_t* compl_custom_string_init(size_t allocationSize)  {
-	string_t *str = malloc(sizeof(string_t));
-
-	str->text = malloc(allocationSize);
-	str->text[0] = '\0';
-
-	str->text_length = 0;
-	str->text_allocated_length = allocationSize;
+string_t *str = malloc(sizeof(string_t));
+str->text = malloc(allocationSize);
+str->text[0] = '\0';
+str->text_length = 0;
+str->text_allocated_length = allocationSize;
 return str;
 }
  string_t* compl_string_copyvalueof(char *src)  {
-	size_t srcLength = strlen(src);
-
-	string_t *dest = malloc(sizeof(string_t));
-	dest->text = strdup(src);
-	dest->text_length = srcLength;
-	dest->text_allocated_length = srcLength + 1;
+size_t srcLength = strlen(src);
+string_t *dest = malloc(sizeof(string_t));
+dest->text = strdup(src);
+dest->text_length = srcLength;
+dest->text_allocated_length = srcLength + 1;
 return dest;
 }
  string_t* compl_string_copyvalueof_s(string_t *src)  {
-	string_t *dest = malloc(sizeof(string_t));
-	dest->text = strdup(src->text);
-	dest->text_length = src->text_length;
-	dest->text_allocated_length = src->text_length + 1;
+string_t *dest = malloc(sizeof(string_t));
+dest->text = strdup(src->text);
+dest->text_length = src->text_length;
+dest->text_allocated_length = src->text_length + 1;
 return dest;
 }
  void compl_string_printf(string_t *dest, char *format, ...)  {
-	va_list args;
-	va_start(args, format);
-	int argsLength = strlen(format);
+va_list args;
+va_start(args, format);
+int argsLength = strlen(format);
 for (num  i =  0 ;  i <  argsLength ;  i++) {
-		char first = format[i];
-		char second = (i + 1 < argsLength) ? format[i+1] : '\0';
-		char *arg;
+char first = format[i];
+char second = (i + 1 < argsLength) ? format[i+1] : '\0';
+char *arg;
 if ( first == '%' && second == 's' ) {
-			arg = va_arg(args, char*);
-			i++;
+arg = va_arg(args, char*);
+i++;
 } else {
-			arg = malloc(2 * sizeof(char));
-			arg[0] = first;
-			arg[1] = '\0';
+arg = malloc(2 * sizeof(char));
+arg[0] = first;
+arg[1] = '\0';
 }
-		int argLength = strlen(arg);
-		string_meminspection(argLength, dest);
-		strncat(dest->text, arg, argLength);
-		dest->text_length += argLength;
+int argLength = strlen(arg);
+string_meminspection(argLength, dest);
+strncat(dest->text, arg, argLength);
+dest->text_length += argLength;
 }
-	va_end(args);
+va_end(args);
 return;
 }
  void compl_string_append(string_t *dest, char *src)  {
-	int srcLength = strlen(src);
-	string_meminspection(srcLength, dest);
-
-	strncat(dest->text, src, srcLength);
-	dest->text_length += srcLength;
+int srcLength = strlen(src);
+string_meminspection(srcLength, dest);
+strncat(dest->text, src, srcLength);
+dest->text_length += srcLength;
 return;
 }
  void compl_string_append_s(string_t *dest, string_t *src)  {
-	string_meminspection(src->text_length, dest);
-	strncat(dest->text, src->text, src->text_length);
-	dest->text_length += src->text_length;
+string_meminspection(src->text_length, dest);
+strncat(dest->text, src->text, src->text_length);
+dest->text_length += src->text_length;
 return;
 }
  void compl_string_appendchar(string_t *dest, char letter)  {
-	string_meminspection(1, dest);
-	char text[2];
-	text[0] = letter;
-	text[1] = '\0';
-	strcat(dest->text, text);
-	dest->text_length++;
+string_meminspection(1, dest);
+char text[2];
+text[0] = letter;
+text[1] = '\0';
+strcat(dest->text, text);
+dest->text_length++;
 return;
 }
+ bool compl_string_isempty(string_t *str)  {
+if ( str->text_length == 0 ) {
+return true;
+} else {
+for (num  i =  0 ;  i <  str->text_length ;  i++) {
+if ( !isspace(str->text[i]) ) {
+return false;
+}
+}
+}
+return true;
+}
  int compl_string_indexof_s(string_t *src, char *stopSign)  {
-	int stopSignLength = strlen(stopSign);
-	bool found = true;
+int stopSignLength = strlen(stopSign);
+bool found = true;
 for (num  i =  0 ;  i <  (int) src->text_length - stopSignLength + 1 ;  i++) {
 for (num  j =  0 ;  j <  stopSignLength ;  j++) {
 if ( src->text[i+j] != stopSign[j] ) {
-				found = false;
-				break;
+found = false;
+break;
 }
 }
 if ( found ) {
 return i;
 }
-		found = true;
+found = true;
 }
 return -1;
 }
  string_t** compl_string_split(char delimiter, string_t *src)  {
-	// Safety
-	// If the string is length 2 or less, then it is not possible to split the string
 if ( src->text_length <= 2 ) {
-		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
-				"Unable to substring a string with %d length!",
-				src->text_length);
+throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
+"Unable to substring a string with %d length!",
+src->text_length);
 }
-
-	char delimiterText[2];
-	delimiterText[0] = delimiter;
-	delimiterText[1] = '\0';
-	int splitIndex = strcspn(src->text, delimiterText);
-
-	// Was splitIndex == src->text
+char delimiterText[2];
+delimiterText[0] = delimiter;
+delimiterText[1] = '\0';
+int splitIndex = strcspn(src->text, delimiterText);
 if ( splitIndex == (int)src->text_length ) {
 return NULL;
 }
-
-	string_t **strList = malloc(2 * sizeof(string_t));
-	strList[0] = custom_string_init(src->text_length / 2);
-	strList[1] = custom_string_init(src->text_length / 2);
-
+string_t **strList = malloc(2 * sizeof(string_t));
+strList[0] = custom_string_init(src->text_length / 2);
+strList[1] = custom_string_init(src->text_length / 2);
 for (num  i =  0 ;  i <  splitIndex ;  i++) {
-		string_appendchar(strList[0], src->text[i]);
+string_appendchar(strList[0], src->text[i]);
 }
-	// for splitIndex + 1 to src->text_length do i++
 for (num  i =  0 ;  i <  (int) src->text_length ;  i++) {
-		string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
+string_appendchar(strList[1], src->text[(splitIndex + 1) + i]);
 }
 return strList;
 }
  bool compl_string_equals(string_t *dest, const char *src)  {
-	unsigned srcLength = strlen(src);
+unsigned srcLength = strlen(src);
 if ( dest->text_length != srcLength ) {
 return false;
 } else {
@@ -716,16 +644,17 @@ return true;
  bool compl_string_startswith_s(string_t *src, string_t *search)  {
 if ( search->text_length > src->text_length ) {
 return false;
-}
+} else {
 for (num  i =  0 ;  i <  (int)search->text_length ;  i++) {
 if ( src->text[i] != search->text[i] ) {
 return false;
 }
 }
-return true;;
+}
+return true;
 }
  bool compl_string_startswith(string_t *src, const char *search)  {
-	unsigned searchLength = strlen(search);
+unsigned searchLength = strlen(search);
 if ( searchLength > src->text_length ) {
 return false;
 }
@@ -734,93 +663,87 @@ if ( src->text[i] != search[i] ) {
 return false;
 }
 }
-return true;;
+return true;
 }
  string_t* compl_string_substring_s(int startIndex, int endIndex, string_t *src)  {
-	size_t totalAppend = endIndex - startIndex; // 1 - 0
+size_t totalAppend = endIndex - startIndex; // 1 - 0
 if ( totalAppend > src->text_length ) {
-		throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
-				"Unable to substring a string starting from index %d and ending %d",
-				startIndex, endIndex);
+throw_exception(INDEX_OUT_OF_BOUNDS_EXCEPTION, -1,
+"Unable to substring a string starting from index %d and ending %d",
+startIndex, endIndex);
 }
-	string_t *newStr = custom_string_init(totalAppend + 2);
-	strncpy(newStr->text, src->text + startIndex, totalAppend);
-	newStr->text[totalAppend] = '\0';
-	newStr->text_length = totalAppend;
-return newStr;;
+string_t *newStr = custom_string_init(totalAppend + 2);
+strncpy(newStr->text, src->text + startIndex, totalAppend);
+newStr->text[totalAppend] = '\0';
+newStr->text_length = totalAppend;
+return newStr;
 }
  void compl_string_tolowercase_s(string_t *dest)  {
 for (num  i =  0 ;  i <  (int)dest->text_length ;  i++) {
-		dest->text[i] = tolower(dest->text[i]);
+dest->text[i] = tolower(dest->text[i]);
 }
 return;
 }
  bool compl_string_serialize(string_t *src, FILE *stream)  {
-	fwrite(&src->text_length, sizeof(int), 1, stream);
-	fwrite(src->text, sizeof(char), src->text_length, stream);
-return true;;
+fwrite(&src->text_length, sizeof(int), 1, stream);
+fwrite(src->text, sizeof(char), src->text_length, stream);
+return true;
 }
  string_t* compl_string_deserialize(FILE *stream)  {
-	int textLength;
-	fread(&textLength, sizeof(int), 1, stream);
-
-	string_t *str = custom_string_init(textLength + STRING_ALLOCATION_SIZE);
-	fread(str->text, sizeof(char), textLength, stream);
-	str->text_length = textLength;
-return str;;
+int textLength;
+fread(&textLength, sizeof(int), 1, stream);
+string_t *str = custom_string_init(textLength + STRING_ALLOCATION_SIZE);
+fread(str->text, sizeof(char), textLength, stream);
+str->text_length = textLength;
+return str;
 }
  void compl_string_reset(string_t *dest)  {
-	dest->text[0] = '\0';
-	dest->text_length = 0;
+dest->text[0] = '\0';
+dest->text_length = 0;
 return;
 }
  void compl_string_free(void *dest)  {
-	free(((string_t*) dest)->text);
-// Free the structure itself
-	free(((string_t*) dest));
+free(((string_t*) dest)->text);
+free(((string_t*) dest));
 return;
 }
 static  void compl_string_meminspection(size_t addNum, string_t *subject)  {
-	// +1 for accounting the null terminator
 if ( subject->text_length + addNum + 1 >= subject->text_allocated_length ) {
-		size_t newSize = 1.5 * subject->text_allocated_length + addNum + 1;
-		char *tempStr = (char *) realloc(subject->text, newSize);
-		// Safety
+size_t newSize = 1.5 * subject->text_allocated_length + addNum + 1;
+char *tempStr = (char *) realloc(subject->text, newSize);
 if ( tempStr == NULL ) {
-			throw_exception(NULL_POINTER_EXCEPTION, -1,
-					"Unable to allocate memory for string while doing meminspection!\n");
+throw_exception(NULL_POINTER_EXCEPTION, -1,
+"Unable to allocate memory for string while doing meminspection!\n");
 }
-		subject->text = tempStr;
-		subject->text_allocated_length = newSize;
+subject->text = tempStr;
+subject->text_allocated_length = newSize;
 }
 return;
 }
  void compl_throw_exception(exception e, int lineNum, char *message, ...)  {
-	va_list args;
-	va_start(args, message);
-	char cMessage[AVG_STRING_SIZE];
+va_list args;
+va_start(args, message);
+char cMessage[AVG_STRING_SIZE];
 if ( lineNum == -1 ) {
-		strncpy(cMessage, "Internal Error [", AVG_STRING_SIZE);
-		vsnprintf(cMessage, AVG_STRING_SIZE, message, args);
-		strcat(cMessage, "]"); 
+strncpy(cMessage, "Internal Error [", AVG_STRING_SIZE);
+vsnprintf(cMessage, AVG_STRING_SIZE, message, args);
+strcat(cMessage, "]"); 
 } else {
-		snprintf(cMessage, AVG_STRING_SIZE, "Line #%d", lineNum);
+snprintf(cMessage, AVG_STRING_SIZE, "Line #%d", lineNum);
 }
-	va_end(args);
-
-// Goes through the different types of error and prints out the appropriate message
-	switch (e) {
-	case ERRNO_EXCEPTION:
-		perror(cMessage);
-		break;
-	case NULL_POINTER_EXCEPTION:
-		fprintf(stderr, "%s: %s\n", cMessage, message);
-		break;
-	case INDEX_OUT_OF_BOUNDS_EXCEPTION:
-		fprintf(stderr, "%s: %s\n", cMessage, message);
-		break;
-	default:
-		break;
-	}
+va_end(args);
+switch (e) {
+case ERRNO_EXCEPTION:
+perror(cMessage);
+break;
+case NULL_POINTER_EXCEPTION:
+fprintf(stderr, "%s: %s\n", cMessage, message);
+break;
+case INDEX_OUT_OF_BOUNDS_EXCEPTION:
+fprintf(stderr, "%s: %s\n", cMessage, message);
+break;
+default:
+break;
+}
 return;
 }

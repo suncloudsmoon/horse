@@ -85,6 +85,8 @@ typedef struct {
 } class_t;
 
 // Horse Identifiers
+const char *doubleSlashComment = "//";
+
 const char *functionIdentifier = "def";
 const char *privateFunctionIdentifier = "private def";
 const char *endIdentifier = "end";
@@ -194,8 +196,9 @@ return letter == EOF
 def parse(compiler_t *com) returns void
 	for 0 to (int)com->allLines->data_length do i++
 		string_t *existingLine = (string_t*) com->allLines->data[i];
+		// All the ascii letters except for special ascii characters below ascii number 32
 		int firstLetter = strcspn(existingLine->text,
-				"abcdefghijklmnopqrstuvwxyz0123456789#{}/");
+				"!\"#$%&\'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
 		string_t *initialClean = string_substring_s(firstLetter,
 				existingLine->text_length, existingLine);
 		list_add(initialClean, com->cleanedLines);		
@@ -243,9 +246,16 @@ def compile(compiler_t *com) returns void
 	list_add(string_copyvalueof("#define num long long int"), com->definitions);
 	string_t *parsed;
 	for 0 to (int) com->parsedLines->data_length do i++
+		string_t *line = (string_t*) com->cleanedLines->data[i];
+
+		// continue and ignore the rest if it is a comment! :)
+		if string_startswith(line, doubleSlashComment) || string_isempty(line) then
+			continue;
+		end	
+
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
-		string_t *line = (string_t*) com->cleanedLines->data[i];
+		
 
 		if string_equals(firstToken, classIdentifier) then
 			// class blah not class blah extends object
@@ -256,7 +266,6 @@ def compile(compiler_t *com) returns void
 			continue;
 
 		or if string_equals(firstToken, functionIdentifier) then
-			// function blah() returns void
 			parsed = string_init();
 			class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
 			handleFunction(line, currentClass, com, parsed);
@@ -269,7 +278,6 @@ def compile(compiler_t *com) returns void
 			com->scope++;
 			
 		or if string_equals(firstToken, returnIdentifier) then
-			// return blah;
 			parsed = string_init();
 			if com->scope == 1 then
 				string_printf(parsed, "%s;\n}", line->text);
@@ -337,7 +345,7 @@ def compile(compiler_t *com) returns void
 			string_free(importItem);
 			continue; // don't add it to the restOfLines list
 		or
-			parsed = string_copyvalueof_s((string_t*) com->allLines->data[i]);
+			parsed = line;
 		end
 
 		if com->classes->data_length > 0 && com->scope > 0 then
@@ -682,6 +690,19 @@ def string_appendchar(string_t *dest, char letter) returns void
 	dest->text_length++;
 return
 
+// Checks if the string length == 0 or if the string only contains whitespace
+def string_isempty(string_t *str) returns bool
+	if str->text_length == 0 then
+		return true;
+	or
+		for 0 to str->text_length do i++
+			if !isspace(str->text[i]) then
+				return false;
+			end
+		end
+	end	
+return true
+
 /*
 	returns -1 if no stopSign was found
 */
@@ -780,13 +801,14 @@ end
 def string_startswith_s(string_t *src, string_t *search) returns bool
 	if search->text_length > src->text_length then
 		return false;
-	end
-	for 0 to (int)search->text_length do i++
-		if src->text[i] != search->text[i] then
-			return false;
-		end	
-	end
-return true;
+	or
+		for 0 to (int)search->text_length do i++
+			if src->text[i] != search->text[i] then
+				return false;
+			end	
+		end
+	end	
+return true
 
 def string_startswith(string_t *src, const char *search) returns bool
 	unsigned searchLength = strlen(search);
@@ -798,7 +820,7 @@ def string_startswith(string_t *src, const char *search) returns bool
 			return false;
 		end	
 	end
-return true;
+return true
 
 def string_substring_s(int startIndex, int endIndex, string_t *src) returns string_t*
 	size_t totalAppend = endIndex - startIndex; // 1 - 0
@@ -811,7 +833,7 @@ def string_substring_s(int startIndex, int endIndex, string_t *src) returns stri
 	strncpy(newStr->text, src->text + startIndex, totalAppend);
 	newStr->text[totalAppend] = '\0';
 	newStr->text_length = totalAppend;
-return newStr;
+return newStr
 
 def string_tolowercase_s(string_t *dest) returns void
 	for 0 to (int)dest->text_length do i++
@@ -822,7 +844,7 @@ return
 def string_serialize(string_t *src, FILE *stream) returns bool
 	fwrite(&src->text_length, sizeof(int), 1, stream);
 	fwrite(src->text, sizeof(char), src->text_length, stream);
-return true;
+return true
 
 def string_deserialize(FILE *stream) returns string_t*
 	int textLength;
@@ -831,7 +853,7 @@ def string_deserialize(FILE *stream) returns string_t*
 	string_t *str = custom_string_init(textLength + STRING_ALLOCATION_SIZE);
 	fread(str->text, sizeof(char), textLength, stream);
 	str->text_length = textLength;
-return str;
+return str
 
 def string_reset(string_t *dest) returns void
 	dest->text[0] = '\0';
