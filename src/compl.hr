@@ -73,26 +73,27 @@ typedef struct {
 } compiler_t;
 
 typedef struct {
-	// like void (*foo) (void);
-	string_t *returnType;
 	string_t *name;
-	list_t *parameters;
-} vTable_t;
 
-typedef struct {
-	string_t *name;
+	// Constructor
+	list_t *constructorLines;
 
 	// Inside the class struct stuff
 	list_t *globalVariables; // like int a;
 	list_t *vTableList; // list of vTable_t
-
-	list_t *sourceDefinitions; // like #define f compl_f
 
 	string_t *includeStatements;
 	list_t *definitions; // and definitions
 	list_t *prototypes; // function prototypes
 	list_t *restOfLines;
 } class_t;
+
+typedef struct {
+	// like void (*foo) (void);
+	string_t *returnType;
+	string_t *name;
+	list_t *parameters;
+} vTable_t;
 
 // Horse Identifiers
 const char *doubleSlashComment = "//";
@@ -147,7 +148,14 @@ def main(int argc, char **argv) returns int
 	clock_t end = clock(); // End the stopwatch
 	double time_spent = (double) (end - start) / CLOCKS_PER_SEC;
 	printf("[main] Program Benchmark: %.2f second(s)\n", time_spent);
+
+	// compl com;
+	// com.foo = &foo;
 return 0
+
+// def foo() returns void
+// 	printf("Foo is 5\n");
+// return
 
 def startCompiler(string_t *directory, string_t *inputFilename) returns void
 	FILE *input = fopen(inputFilename->text, "r");
@@ -192,8 +200,6 @@ def class_new(string_t *name, string_t *includeStatements) returns class_t*
 	// class struct stuff
 	newClass->globalVariables = list_init();
 	newClass->vTableList = list_init();
-
-	newClass->sourceDefinitions = list_init();
 
 	newClass->includeStatements = includeStatements;
 	newClass->definitions = list_init();
@@ -272,7 +278,7 @@ private def split(char delimiter, string_t *line) returns list_t*
 return output
 
 private def isSpecialCharacter(char alpha) returns bool
-	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')'	
+	return alpha == '"' || alpha == '\''
 
 def compile(compiler_t *com) returns void
 	// add definitions to file
@@ -413,27 +419,22 @@ return
 private def handleFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest) returns void
 	// EXAMPLE: def blah() returns void
 	string_t *functName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
-	string_t *functBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
-	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
+	string_t *functBody = string_substring_s(string_indexof_s(contextLine, "(") + 1, string_lastindexof_s(contextLine, ")"), contextLine);
+	string_t *returnType = string_substring_s(string_lastindexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
 
-	if string_equals(functName, "main") then
-		string_printf(dest, "%s %s", returnType->text, functBody->text);
-	or
-		string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functBody->text);
-		addSourceFunctionDefinition(functName, com); // like #define funct class_functName
-	end		
-	addFunctionHeader(dest, com); // Add function header thing "void foo()" to the header file
+	string_printf(dest, "%s %s(%s)", returnType->text, functName->text, functBody->text);
+	if !string_equals(functName, "main") then
+		addFunctionHeader(dest, com); // Add function header thing "void foo()" to the top of the source file
+	end
 	string_append(dest, " {"); // complete the function header to be added to source in the future
 
 	// Add function to vTable
-	string_t *parametersOnly = string_substring_s(string_indexof_s(contextLine, "(") + 1, string_indexof_s(contextLine, ")"), contextLine);
-	list_add(functionToVTable(returnType, functName, parametersOnly), currentClass->vTableList);
+	list_add(functionToVTable(returnType, functName, functBody), currentClass->vTableList);
 
 	// Free resources
 	string_free(functName);
 	string_free(functBody);
 	string_free(returnType);
-	string_free(parametersOnly);
 return
 
 // IDEA: String *str = "hello" is heap string and String str = "hello" is stack string
@@ -448,9 +449,8 @@ private def handlePrivateFunction(string_t *contextLine, class_t *currentClass, 
 	string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
 	string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
 	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
-	string_printf(dest, "static %s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-	
-	addSourceFunctionDefinition(functionName, com);
+	string_printf(dest, "static %s %s", returnType->text, functionBody->text);
+
 	addFunctionHeader(dest, com);
 	string_append(dest, " {");
 
@@ -466,13 +466,6 @@ private def addFunctionHeader(string_t *functionBody, compiler_t *com) returns v
 	string_t *funct = string_init();
 	string_printf(funct, "%s;", functionBody->text);
 	list_add(funct, ((class_t*)com->classes->data[com->currentClass])->prototypes);
-return
-
-private def addSourceFunctionDefinition(string_t *functionName, compiler_t *com) returns void
-	class_t *currentClass = (class_t*) com->classes->data[com->currentClass];
-	string_t *def = string_init();
-	string_printf(def, "#define %s %s_%s", functionName->text, currentClass->name->text, functionName->text);
-	list_add(def, currentClass->sourceDefinitions);
 return
 
 private def addDefinitionToHeader(string_t *definition, compiler_t *com) returns void
@@ -538,11 +531,7 @@ private def writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass) r
 	string_t *classStruct = string_init();
 	getClassStruct(currentClass, classStruct);
 	fprintf(headerFile, "%s\n", classStruct->text);
-
-	// Add the function prototypes
-	for 0 to currentClass->prototypes->data_length do j++
-		fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
-	end
+	
 	fprintf(headerFile, "#endif\n");
 	fclose(headerFile);
 return
@@ -555,7 +544,8 @@ private def getClassStruct(class_t *currentClass, string_t *cls) returns void
 		string_t *parametersStr = string_init();
 		paramListToStr(vTable->parameters, parametersStr);
 		// LEARNED: string_printf APPENDS and doesn't emulate the behavior of sprintf
-		string_printf(cls, "%s (*%s_%s) (%s);\n", vTable->returnType->text, currentClass->name->text, vTable->name->text, parametersStr->text);
+		string_printf(cls, "%s (*%s) (%s);\n", vTable->returnType->text, vTable->name->text, parametersStr->text);
+		string_free(parametersStr);
 	end
 	string_printf(cls, "};\n");
 return
@@ -576,9 +566,9 @@ private def writeToSourceFile(string_t *fullSourcePath, class_t *currentClass) r
 	fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
 	fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
 
-	// Add #defines function stuff to source file
-	for 0 to currentClass->sourceDefinitions->data_length do j++
-		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j])->text);
+	// Add the function prototypes
+	for 0 to currentClass->prototypes->data_length do j++
+		fprintf(sourceFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
 	end
 	
 	// Add everything else
@@ -800,10 +790,31 @@ def string_indexof_s(string_t *src, char *stopSign) returns int
 		end
 		if found then
 			return i;
+		or
+			found = true;
 		end	
-		found = true;
 	end
 return -1
+
+def string_lastindexof_s(string_t *src, char *stopSign) returns int
+	int stopSignLength = strlen(stopSign);
+	int lastIndexFound = -1;
+	bool found = true;
+	for 0 to src->text_length - stopSignLength + 1 do i++
+		for 0 to stopSignLength do j++
+			if src->text[i+j] != stopSign[j] then
+				found = false;
+				break;
+			end
+		end
+		if found then
+			lastIndexFound = i;
+			found = false;
+		or	
+			found = true;
+		end
+	end
+return lastIndexFound
 
 def string_split(char delimiter, string_t *src) returns string_t**
 	// Safety
