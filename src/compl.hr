@@ -29,6 +29,7 @@ import errno
 import stdarg
 import ctype
 import string
+import time
 
 class compl
 
@@ -72,11 +73,20 @@ typedef struct {
 } compiler_t;
 
 typedef struct {
+	// like void (*foo) (void);
+	string_t *returnType;
+	string_t *name;
+	list_t *parameters;
+} vTable_t;
+
+typedef struct {
 	string_t *name;
 
-	list_t *sourceDefinitions; // like #define f compl_f
+	// Inside the class struct stuff
+	list_t *globalVariables; // like int a;
+	list_t *vTableList; // list of vTable_t
 
-	list_t *classTypedef;
+	list_t *sourceDefinitions; // like #define f compl_f
 
 	string_t *includeStatements;
 	list_t *definitions; // and definitions
@@ -111,6 +121,8 @@ const char *numDataType = "long long int";
 const char *defFileName = "DEF";
 
 def main(int argc, char **argv) returns int
+	clock_t start = clock(); // Start the stopwatch
+
 	string_t *inputFilename, *directory;
 	// Arguments: [compiler executable] [directory] [directory/inputFile] [directory/outputFile]
 	if argc >= 4 then
@@ -131,6 +143,10 @@ def main(int argc, char **argv) returns int
 		// Free resources
 		string_free(inputFilename);
 	end
+
+	clock_t end = clock(); // End the stopwatch
+	double time_spent = (double) (end - start) / CLOCKS_PER_SEC;
+	printf("[main] Program Benchmark: %.2f second(s)\n", time_spent);
 return 0
 
 def startCompiler(string_t *directory, string_t *inputFilename) returns void
@@ -169,8 +185,38 @@ def compiler_free(compiler_t *com) returns void
 	free(com);
 return
 
+def class_new(string_t *name, string_t *includeStatements) returns class_t*
+	class_t *newClass = malloc(sizeof(class_t));
+	newClass->name = name;
+
+	// class struct stuff
+	newClass->globalVariables = list_init();
+	newClass->vTableList = list_init();
+
+	newClass->sourceDefinitions = list_init();
+
+	newClass->includeStatements = includeStatements;
+	newClass->definitions = list_init();
+	newClass->prototypes = list_init();
+
+	newClass->restOfLines = list_init();
+return newClass
+
+// VTable stuff //
+
+def vTable_new(string_t *returnType, string_t *name, list_t *parameters, vTable_t *vTable) returns void
+	vTable->returnType = string_copyvalueof_s(returnType);
+	vTable->name = string_copyvalueof_s(name);
+	vTable->parameters = parameters; // TODO: fix this because it does not do copyvalueof()
+return
+
+def vTable_delete(vTable_t *vTable) returns void
+	string_free(vTable->returnType);
+	string_free(vTable->name);
+	list_complete_free(&string_free, vTable->parameters);
+return
+
 def ignition(compiler_t *com) returns void
-	printf("[ignition] program starting!\n");
 	readAllLines(com);
 	parse(com);
 	compile(com);
@@ -226,20 +272,7 @@ private def split(char delimiter, string_t *line) returns list_t*
 return output
 
 private def isSpecialCharacter(char alpha) returns bool
-	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';
-
-def class_new(string_t *name, string_t *includeStatements) returns class_t*
-	class_t *newClass = malloc(sizeof(class_t));
-	newClass->name = name;
-
-	newClass->sourceDefinitions = list_init();
-
-	newClass->includeStatements = includeStatements;
-	newClass->definitions = list_init();
-	newClass->prototypes = list_init();
-
-	newClass->restOfLines = list_init();
-return newClass
+	return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')'	
 
 def compile(compiler_t *com) returns void
 	// add definitions to file
@@ -255,7 +288,6 @@ def compile(compiler_t *com) returns void
 
 		list_t *tokens = (list_t *) com->parsedLines->data[i];
 		string_t *firstToken = (string_t*) tokens->data[0];
-		
 
 		if string_equals(firstToken, classIdentifier) then
 			// class blah not class blah extends object
@@ -294,7 +326,7 @@ def compile(compiler_t *com) returns void
 			list_add(parsed, ((class_t*) com->classes->data[com->currentClass])->restOfLines);
 			com->scope--;
 			continue;
-			// TODO: fix this mess
+			// TODO: please fix this mess
 
 		or if string_startswith(line, ifIdentifier) then
 			// if blah then
@@ -379,28 +411,40 @@ private def handleForLoop(string_t *line, string_t *dest) returns void
 return
 
 private def handleFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest) returns void
-	// def blah() returns void
-	string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
-	string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
+	// EXAMPLE: def blah() returns void
+	string_t *functName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
+	string_t *functBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
 	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
 
-	if string_equals(functionName, "main") then
-		string_printf(dest, "%s %s", returnType->text, functionBody->text);
+	if string_equals(functName, "main") then
+		string_printf(dest, "%s %s", returnType->text, functBody->text);
 	or
-		string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-		addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
+		string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functBody->text);
+		addSourceFunctionDefinition(functName, com); // like #define funct class_functName
 	end		
-	addFunctionHeader(dest, com);
-	string_append(dest, " {");
+	addFunctionHeader(dest, com); // Add function header thing "void foo()" to the header file
+	string_append(dest, " {"); // complete the function header to be added to source in the future
+
+	// Add function to vTable
+	string_t *parametersOnly = string_substring_s(string_indexof_s(contextLine, "(") + 1, string_indexof_s(contextLine, ")"), contextLine);
+	list_add(functionToVTable(returnType, functName, parametersOnly), currentClass->vTableList);
 
 	// Free resources
-	string_free(functionName);
-	string_free(functionBody);
+	string_free(functName);
+	string_free(functBody);
 	string_free(returnType);
+	string_free(parametersOnly);
 return
 
+// IDEA: String *str = "hello" is heap string and String str = "hello" is stack string
+private def functionToVTable(string_t *returnType, string_t *functName, string_t *functBody) returns vTable_t*
+	list_t *parameters = split(',', functBody);
+	vTable_t *vTable = malloc(sizeof(vTable_t));
+	vTable_new(returnType, functName, parameters, vTable);
+return vTable
+
 private def handlePrivateFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest) returns void
-	// private def blah() returns void
+	// EXAMPLE: private def blah() returns void
 	string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
 	string_t *functionBody = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
 	string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
@@ -435,24 +479,11 @@ private def addDefinitionToHeader(string_t *definition, compiler_t *com) returns
 	list_add(definition, ((class_t*) com->classes->data[com->currentClass])->definitions);
 return
 
-def writeToFile(compiler_t *com) returns int
-	string_t *fullDefPath = string_init();
+def writeToFile(compiler_t *com) returns void
+	// Write to definition header
+	writeToDefFile(com->directory, com->definitions);
 
-	// Double underscore is a used as a way to indicate that the file is Horse language specific	
-	string_printf(fullDefPath, "%s/__%s__.h", com->directory->text, defFileName);
-	FILE *definitions = fopen(fullDefPath->text, "w");
-	fprintf(definitions, "#ifndef %s_H_\n", defFileName);
-	fprintf(definitions, "#define %s_H_\n", defFileName);
-
-	// Writing defintions to a separate file and the user must include it in their project
-	for 0 to com->definitions->data_length do i++
-		fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
-	end
-	fprintf(definitions, "#endif\n");	
-	// Free memory
-	string_free(fullDefPath);
-	fclose(definitions);
-
+	// Write all classes
 	for 0 to com->classes->data_length do i++
 		class_t *currentClass = (class_t*) com->classes->data[i];
 		string_t *fullHeaderPath = string_init();
@@ -466,21 +497,49 @@ def writeToFile(compiler_t *com) returns int
 		string_free(fullHeaderPath);
 		string_free(fullSourcePath);
 	end	
-return 0
+return
+
+// NOTE: the double underscore before files is used to indicate that the file is specific to our language
+private def writeToDefFile(string_t *directory, list_t *definitionsList) returns void
+	string_t *fullDefPath = string_init();	
+	string_printf(fullDefPath, "%s/__%s__.h", directory->text, defFileName);
+	
+	FILE *definitions = fopen(fullDefPath->text, "w");
+	fprintf(definitions, "// This file was automatically generated by the horse compiler\n");
+	fprintf(definitions, "#ifndef %s_H_\n", defFileName);
+	fprintf(definitions, "#define %s_H_\n", defFileName);
+	for 0 to definitionsList->data_length do i++
+		fprintf(definitions, "%s\n", ((string_t *) definitionsList->data[i])->text);
+	end
+	fprintf(definitions, "#endif\n");
+
+	// Free resources
+	string_free(fullDefPath);
+	fclose(definitions);
+return
 
 private def writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass) returns void
-	// Writing header to file
+	// Add necessary header components
 	FILE *headerFile = fopen(fullHeaderPath->text, "w");
 	fprintf(headerFile, "// This file was automatically generated by the horse compiler\n");
 	fprintf(headerFile, "#ifndef %s_H_\n", currentClass->name->text);
 	fprintf(headerFile, "#define %s_H_\n", currentClass->name->text);
 	fprintf(headerFile, "#include \"__%s__.h\"\n", defFileName); // core definitions of Horse
-	
-	// Add header stuff to file
+
+	// Add header stuff
 	fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
+
+	// Add global variables and other misc stuff
 	for 0 to currentClass->definitions->data_length do j++
 		fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
 	end	
+
+	// Add the class struct
+	string_t *classStruct = string_init();
+	getClassStruct(currentClass, classStruct);
+	fprintf(headerFile, "%s\n", classStruct->text);
+
+	// Add the function prototypes
 	for 0 to currentClass->prototypes->data_length do j++
 		fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
 	end
@@ -488,8 +547,31 @@ private def writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass) r
 	fclose(headerFile);
 return
 
+private def getClassStruct(class_t *currentClass, string_t *cls) returns void
+	string_printf(cls, "typedef struct %s %s;\n", currentClass->name->text, currentClass->name->text);
+	string_printf(cls, "struct %s {\n", currentClass->name->text);
+	for 0 to currentClass->vTableList->data_length do i++
+		vTable_t *vTable = (vTable_t*) currentClass->vTableList->data[i];
+		string_t *parametersStr = string_init();
+		paramListToStr(vTable->parameters, parametersStr);
+		// LEARNED: string_printf APPENDS and doesn't emulate the behavior of sprintf
+		string_printf(cls, "%s (*%s_%s) (%s);\n", vTable->returnType->text, currentClass->name->text, vTable->name->text, parametersStr->text);
+	end
+	string_printf(cls, "};\n");
+return
+
+private def paramListToStr(list_t *params, string_t *dest) returns void
+	for 0 to params->data_length do i++
+		string_t *param = (string_t*) params->data[i];
+		string_append_s(dest, param);
+		if i < params->data_length - 1 then
+			string_append(dest, ",");
+		end
+	end		
+return
+	
 private def writeToSourceFile(string_t *fullSourcePath, class_t *currentClass) returns void
-	// Writing source to file
+	// Add necessary source components
 	FILE *sourceFile = fopen(fullSourcePath->text, "w");
 	fprintf(sourceFile, "// This file was automatically generated by the horse compiler\n");
 	fprintf(sourceFile, "#include \"%s.h\"\n", currentClass->name->text);
@@ -499,11 +581,11 @@ private def writeToSourceFile(string_t *fullSourcePath, class_t *currentClass) r
 		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j])->text);
 	end
 	
-	// Add the lump sum of all functions to the source file
+	// Add everything else
 	for 0 to currentClass->restOfLines->data_length do j++
 		fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
-		// Test	
-		fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
+		// Debug print stuff	
+		fprintf(stdout, "[writeToSourceFile] writing: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
 	end
 	fclose(sourceFile);
 return

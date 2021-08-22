@@ -3,22 +3,28 @@
 #define startCompiler compl_startCompiler
 #define compiler_init compl_compiler_init
 #define compiler_free compl_compiler_free
+#define class_new compl_class_new
+#define vTable_new compl_vTable_new
+#define vTable_delete compl_vTable_delete
 #define ignition compl_ignition
 #define readAllLines compl_readAllLines
 #define readLine compl_readLine
 #define parse compl_parse
 #define split compl_split
 #define isSpecialCharacter compl_isSpecialCharacter
-#define class_new compl_class_new
 #define compile compl_compile
 #define handleForLoop compl_handleForLoop
 #define handleFunction compl_handleFunction
+#define functionToVTable compl_functionToVTable
 #define handlePrivateFunction compl_handlePrivateFunction
 #define addFunctionHeader compl_addFunctionHeader
 #define addSourceFunctionDefinition compl_addSourceFunctionDefinition
 #define addDefinitionToHeader compl_addDefinitionToHeader
 #define writeToFile compl_writeToFile
+#define writeToDefFile compl_writeToDefFile
 #define writeToHeaderFile compl_writeToHeaderFile
+#define getClassStruct compl_getClassStruct
+#define paramListToStr compl_paramListToStr
 #define writeToSourceFile compl_writeToSourceFile
 #define list_init compl_list_init
 #define custom_list_init compl_custom_list_init
@@ -59,6 +65,7 @@
 #define string_meminspection compl_string_meminspection
 #define throw_exception compl_throw_exception
  int main(int argc, char **argv)  {
+clock_t start = clock(); // Start the stopwatch
 string_t *inputFilename, *directory;
 if ( argc >= 4 ) {
 printf("[Debug] Successfully accessing the command line arguments!\n");
@@ -76,6 +83,9 @@ inputFilename = string_copyvalueof("src/compl.hr");
 startCompiler(directory, inputFilename);
 string_free(inputFilename);
 }
+clock_t end = clock(); // End the stopwatch
+double time_spent = (double) (end - start) / CLOCKS_PER_SEC;
+printf("[main] Program Benchmark: %.2f second(s)\n", time_spent);
 return 0;
 }
  void compl_startCompiler(string_t *directory, string_t *inputFilename)  {
@@ -108,8 +118,31 @@ list_complete_free(&string_free, com->compiledLines);
 free(com);
 return;
 }
+ class_t* compl_class_new(string_t *name, string_t *includeStatements)  {
+class_t *newClass = malloc(sizeof(class_t));
+newClass->name = name;
+newClass->globalVariables = list_init();
+newClass->vTableList = list_init();
+newClass->sourceDefinitions = list_init();
+newClass->includeStatements = includeStatements;
+newClass->definitions = list_init();
+newClass->prototypes = list_init();
+newClass->restOfLines = list_init();
+return newClass;
+}
+ void compl_vTable_new(string_t *returnType, string_t *name, list_t *parameters, vTable_t *vTable)  {
+vTable->returnType = string_copyvalueof_s(returnType);
+vTable->name = string_copyvalueof_s(name);
+vTable->parameters = parameters; // TODO: fix this because it does not do copyvalueof()
+return;
+}
+ void compl_vTable_delete(vTable_t *vTable)  {
+string_free(vTable->returnType);
+string_free(vTable->name);
+list_complete_free(&string_free, vTable->parameters);
+return;
+}
  void compl_ignition(compiler_t *com)  {
-printf("[ignition] program starting!\n");
 readAllLines(com);
 parse(com);
 compile(com);
@@ -163,17 +196,7 @@ list_add(temp, output);
 return output;
 }
 static  bool compl_isSpecialCharacter(char alpha)  {
-return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')';;
-}
- class_t* compl_class_new(string_t *name, string_t *includeStatements)  {
-class_t *newClass = malloc(sizeof(class_t));
-newClass->name = name;
-newClass->sourceDefinitions = list_init();
-newClass->includeStatements = includeStatements;
-newClass->definitions = list_init();
-newClass->prototypes = list_init();
-newClass->restOfLines = list_init();
-return newClass;
+return alpha == '"' || alpha == '\'' || alpha == '(' || alpha == ')'	;
 }
  void compl_compile(compiler_t *com)  {
 list_add(string_copyvalueof("#define num long long int"), com->definitions);
@@ -276,21 +299,30 @@ string_free(incrementValue);
 return;
 }
 static  void compl_handleFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest)  {
-string_t *functionName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
-string_t *functionBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
+string_t *functName = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
+string_t *functBody = string_substring_s(strlen(functionIdentifier) + 1, string_indexof_s(contextLine, "returns"), contextLine);
 string_t *returnType = string_substring_s(string_indexof_s(contextLine, "returns") + strlen("returns"), contextLine->text_length, contextLine);
-if ( string_equals(functionName, "main") ) {
-string_printf(dest, "%s %s", returnType->text, functionBody->text);
+if ( string_equals(functName, "main") ) {
+string_printf(dest, "%s %s", returnType->text, functBody->text);
 } else {
-string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functionBody->text);
-addSourceFunctionDefinition(functionName, com); // like #define funct class_functionName
+string_printf(dest, "%s %s_%s", returnType->text, currentClass->name->text, functBody->text);
+addSourceFunctionDefinition(functName, com); // like #define funct class_functName
 }
-addFunctionHeader(dest, com);
-string_append(dest, " {");
-string_free(functionName);
-string_free(functionBody);
+addFunctionHeader(dest, com); // Add function header thing "void foo()" to the header file
+string_append(dest, " {"); // complete the function header to be added to source in the future
+string_t *parametersOnly = string_substring_s(string_indexof_s(contextLine, "(") + 1, string_indexof_s(contextLine, ")"), contextLine);
+list_add(functionToVTable(returnType, functName, parametersOnly), currentClass->vTableList);
+string_free(functName);
+string_free(functBody);
 string_free(returnType);
+string_free(parametersOnly);
 return;
+}
+static  vTable_t* compl_functionToVTable(string_t *returnType, string_t *functName, string_t *functBody)  {
+list_t *parameters = split(',', functBody);
+vTable_t *vTable = malloc(sizeof(vTable_t));
+vTable_new(returnType, functName, parameters, vTable);
+return vTable;
 }
 static  void compl_handlePrivateFunction(string_t *contextLine, class_t *currentClass, compiler_t *com, string_t *dest)  {
 string_t *functionName = string_substring_s(strlen(privateFunctionIdentifier) + 1, string_indexof_s(contextLine, "("), contextLine);
@@ -322,18 +354,8 @@ static  void compl_addDefinitionToHeader(string_t *definition, compiler_t *com) 
 list_add(definition, ((class_t*) com->classes->data[com->currentClass])->definitions);
 return;
 }
- int compl_writeToFile(compiler_t *com)  {
-string_t *fullDefPath = string_init();
-string_printf(fullDefPath, "%s/__%s__.h", com->directory->text, defFileName);
-FILE *definitions = fopen(fullDefPath->text, "w");
-fprintf(definitions, "#ifndef %s_H_\n", defFileName);
-fprintf(definitions, "#define %s_H_\n", defFileName);
-for (num  i =  0 ;  i <  com->definitions->data_length ;  i++) {
-fprintf(definitions, "%s\n", ((string_t *) com->definitions->data[i])->text);
-}
-fprintf(definitions, "#endif\n");	
-string_free(fullDefPath);
-fclose(definitions);
+ void compl_writeToFile(compiler_t *com)  {
+writeToDefFile(com->directory, com->definitions);
 for (num  i =  0 ;  i <  com->classes->data_length ;  i++) {
 class_t *currentClass = (class_t*) com->classes->data[i];
 string_t *fullHeaderPath = string_init();
@@ -345,7 +367,22 @@ writeToSourceFile(fullSourcePath, currentClass);
 string_free(fullHeaderPath);
 string_free(fullSourcePath);
 }
-return 0;
+return;
+}
+static  void compl_writeToDefFile(string_t *directory, list_t *definitionsList)  {
+string_t *fullDefPath = string_init();	
+string_printf(fullDefPath, "%s/__%s__.h", directory->text, defFileName);
+FILE *definitions = fopen(fullDefPath->text, "w");
+fprintf(definitions, "// This file was automatically generated by the horse compiler\n");
+fprintf(definitions, "#ifndef %s_H_\n", defFileName);
+fprintf(definitions, "#define %s_H_\n", defFileName);
+for (num  i =  0 ;  i <  definitionsList->data_length ;  i++) {
+fprintf(definitions, "%s\n", ((string_t *) definitionsList->data[i])->text);
+}
+fprintf(definitions, "#endif\n");
+string_free(fullDefPath);
+fclose(definitions);
+return;
 }
 static  void compl_writeToHeaderFile(string_t *fullHeaderPath, class_t *currentClass)  {
 FILE *headerFile = fopen(fullHeaderPath->text, "w");
@@ -357,11 +394,36 @@ fprintf(headerFile, "%s\n", currentClass->includeStatements->text);
 for (num  j =  0 ;  j <  currentClass->definitions->data_length ;  j++) {
 fprintf(headerFile, "%s\n", ((string_t*) currentClass->definitions->data[j])->text);
 }
+string_t *classStruct = string_init();
+getClassStruct(currentClass, classStruct);
+fprintf(headerFile, "%s\n", classStruct->text);
 for (num  j =  0 ;  j <  currentClass->prototypes->data_length ;  j++) {
 fprintf(headerFile, "%s\n", ((string_t*)currentClass->prototypes->data[j])->text);
 }
 fprintf(headerFile, "#endif\n");
 fclose(headerFile);
+return;
+}
+static  void compl_getClassStruct(class_t *currentClass, string_t *cls)  {
+string_printf(cls, "typedef struct %s %s;\n", currentClass->name->text, currentClass->name->text);
+string_printf(cls, "struct %s {\n", currentClass->name->text);
+for (num  i =  0 ;  i <  currentClass->vTableList->data_length ;  i++) {
+vTable_t *vTable = (vTable_t*) currentClass->vTableList->data[i];
+string_t *parametersStr = string_init();
+paramListToStr(vTable->parameters, parametersStr);
+string_printf(cls, "%s (*%s_%s) (%s);\n", vTable->returnType->text, currentClass->name->text, vTable->name->text, parametersStr->text);
+}
+string_printf(cls, "};\n");
+return;
+}
+static  void compl_paramListToStr(list_t *params, string_t *dest)  {
+for (num  i =  0 ;  i <  params->data_length ;  i++) {
+string_t *param = (string_t*) params->data[i];
+string_append_s(dest, param);
+if ( i < params->data_length - 1 ) {
+string_append(dest, ",");
+}
+}
 return;
 }
 static  void compl_writeToSourceFile(string_t *fullSourcePath, class_t *currentClass)  {
@@ -373,7 +435,7 @@ fprintf(sourceFile, "%s\n", ((string_t*) currentClass->sourceDefinitions->data[j
 }
 for (num  j =  0 ;  j <  currentClass->restOfLines->data_length ;  j++) {
 fprintf(sourceFile, "%s\n", ((string_t*) currentClass->restOfLines->data[j])->text);	
-fprintf(stdout, "Writing to file: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
+fprintf(stdout, "[writeToSourceFile] writing: %s\n", ((string_t*) currentClass->restOfLines->data[j])->text);		
 }
 fclose(sourceFile);
 return;
