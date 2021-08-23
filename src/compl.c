@@ -11,6 +11,7 @@
 static  bool readLine(FILE *stream, string_t *line) ;
  void parse(compiler_t *com);
 static  list_t* split(char delimiter, string_t *line) ;
+static  int lex_find(string_t *line, char *format, ...) ;
 static  bool isSpecialCharacter(char alpha) ;
  void compile(compiler_t *com);
 static  void handleForLoop(string_t *line, string_t *dest) ;
@@ -86,6 +87,11 @@ string_free(inputFilename);
 clock_t end = clock(); // End the stopwatch
 double time_spent = (double) (end - start) / CLOCKS_PER_SEC;
 printf("[main] Program Benchmark: %.2f second(s)\n", time_spent);
+string_t *dest = string_init();
+string_t *some = string_init();
+string_printf(some, "if(wow)");
+lex_find(some, "if(%)", dest);
+printf("[main] lex stuff: %s\n", dest->text);
 return 0;
 }
  void startCompiler(string_t *directory, string_t *inputFilename) {
@@ -193,6 +199,30 @@ string_appendchar(temp, alpha);
 }
 list_add(temp, output);
 return output;
+}
+static  int lex_find(string_t *line, char *format, ...)  {
+size_t formatLength = strlen(format);
+bool isSpecial = false;
+va_list args;
+va_start(args, format);
+string_t *formatToLine = string_copyvalueof(format);
+list_t *output = split('%', formatToLine);
+printf("[lex_find] output length: %d\n", output->data_length);
+for (num  i =  0 ;  i <  output->data_length - 1 ;  i++) {
+string_t *arg = (string_t *) va_arg(args, string_t*);
+string_t *first = (string_t*) output->data[i];
+string_t *second = (string_t*) output->data[i+1];
+int firstIndex = string_indexof_s(line, first->text);
+int secondIndex = string_lastindexof_s(line, second->text);
+printf("[lex_find] Index 1,2: %d, %d\n", firstIndex, secondIndex);
+string_t *splitStuff = string_substring_s(firstIndex + first->text_length, secondIndex, line);
+string_printf(arg, "%s", splitStuff->text);
+string_free(first);
+string_free(second);
+string_free(splitStuff);
+}
+va_end(args);
+return -1;
 }
 static  bool isSpecialCharacter(char alpha)  {
 return alpha == '"' || alpha == '\'';

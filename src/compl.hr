@@ -149,13 +149,14 @@ def main(int argc, char **argv) returns int
 	double time_spent = (double) (end - start) / CLOCKS_PER_SEC;
 	printf("[main] Program Benchmark: %.2f second(s)\n", time_spent);
 
-	// compl com;
-	// com.foo = &foo;
+	// lex experiment
+	string_t *dest = string_init();
+	string_t *some = string_init();
+	string_printf(some, "if(wow)");
+	lex_find(some, "if(%)", dest);
+	printf("[main] lex stuff: %s\n", dest->text);
 return 0
 
-// def foo() returns void
-// 	printf("Foo is 5\n");
-// return
 
 def startCompiler(string_t *directory, string_t *inputFilename) returns void
 	FILE *input = fopen(inputFilename->text, "r");
@@ -276,6 +277,33 @@ private def split(char delimiter, string_t *line) returns list_t*
 	end
 	list_add(temp, output);
 return output
+
+// lex_find(line, "if%sthen")
+private def lex_find(string_t *line, char *format, ...) returns int
+	size_t formatLength = strlen(format);
+	bool isSpecial = false;
+	va_list args;
+	va_start(args, format);
+	string_t *formatToLine = string_copyvalueof(format);
+	list_t *output = split('%', formatToLine);
+	printf("[lex_find] output length: %d\n", output->data_length);
+	for 0 to output->data_length - 1 do i++
+		string_t *arg = (string_t *) va_arg(args, string_t*);
+		string_t *first = (string_t*) output->data[i];
+		string_t *second = (string_t*) output->data[i+1];
+		int firstIndex = string_indexof_s(line, first->text);
+		int secondIndex = string_lastindexof_s(line, second->text);
+		printf("[lex_find] Index 1,2: %d, %d\n", firstIndex, secondIndex);
+		string_t *splitStuff = string_substring_s(firstIndex + first->text_length, secondIndex, line);
+		string_printf(arg, "%s", splitStuff->text);
+		
+		// Free resources
+		string_free(first);
+		string_free(second);
+		string_free(splitStuff);
+	end
+	va_end(args);
+return -1
 
 private def isSpecialCharacter(char alpha) returns bool
 	return alpha == '"' || alpha == '\''
